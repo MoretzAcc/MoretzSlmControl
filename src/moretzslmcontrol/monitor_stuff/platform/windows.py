@@ -22,7 +22,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 class WindowsPlatformAdapter(PlatformAdapter):
     @staticmethod
-    def get_screen_edids() -> list[Edid]:
+    def get_screen_edid() -> list[Edid]:
         win_monitors = request_windows_edids()
         return [pyedid.parse_edid(win_monitor.edid) for win_monitor in win_monitors]
 

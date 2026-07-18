@@ -46,7 +46,7 @@ class MonitorManager(QObject):
                 record = MonitorRecord(
                     monitor_id=descriptor.monitor_id,
                     serial_number=descriptor.serial_number,
-                    screen_name=descriptor.screen_name,
+                    screen_name=descriptor.connector_name,
                     manufacturer=descriptor.manufacturer,
                     model=descriptor.model,
                     port_name=descriptor.port_name,
@@ -62,7 +62,7 @@ class MonitorManager(QObject):
                 self._records_by_id[descriptor.monitor_id] = record
             else:
                 record.serial_number = descriptor.serial_number
-                record.screen_name = descriptor.screen_name
+                record.screen_name = descriptor.connector_name
                 record.manufacturer = descriptor.manufacturer
                 record.model = descriptor.model
                 record.port_name = descriptor.port_name

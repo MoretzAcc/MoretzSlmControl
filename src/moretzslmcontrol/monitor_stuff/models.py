@@ -97,7 +97,7 @@ class SessionDebugView:
 class ScreenDescriptor:
     monitor_id: str
     serial_number: str
-    screen_name: str
+    connector_name: str # QScreen.name is connector name for linux, arbitrary for windows tho
     manufacturer: str
     model: str
     port_name: str

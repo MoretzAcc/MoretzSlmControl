@@ -22,25 +22,25 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class PlatformAdapter(ABC):  # noqa: B024
-    
-    @staticmethod
+
     @abstractmethod
-    def get_screen_edids() -> list[Edid]:
+    def get_screen_edid(self, descriptor: ScreenDescriptor) -> Edid | None:
         pass
 
-
-    @staticmethod
-    def describe_screen(screen: QScreen) -> ScreenDescriptor:
+    def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
         dpr = screen.devicePixelRatio()
         geometry = screen.geometry()
         width = round(geometry.width() * dpr)
         height = round(geometry.height() * dpr)
         serial_number = screen.serialNumber().strip()
-        monitor_id = serial_number or f"{screen.name()}_{width}x{height}_{screen.physicalSize().width()}mm_{screen.physicalSize().height()}mm"
-        return ScreenDescriptor(
+        monitor_id = (
+            serial_number
+            or f"{screen.name()}_{width}x{height}_{screen.physicalSize().width()}mm_{screen.physicalSize().height()}mm"
+        )
+        descriptor = ScreenDescriptor(
             monitor_id=monitor_id,
             serial_number=serial_number,
-            screen_name=screen.name().strip(),
+            connector_name=screen.name().strip(),
             manufacturer=screen.manufacturer().strip(),
             model=screen.model().strip(),
             port_name="",
@@ -52,15 +52,15 @@ class PlatformAdapter(ABC):  # noqa: B024
             physical_size_x=screen.physicalSize().width(),
             physical_size_y=screen.physicalSize().height(),
         )
+        edid = self.get_screen_edid(descriptor) # TODO what now? put extra info into descriptor? Especially since edid might be None?
+        return descriptor
 
-    @staticmethod
-    def configure_display_window(window: QWidget) -> None:
+    def configure_display_window(self, window: QWidget) -> None:
         window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
-    @staticmethod
-    def attach_window_to_screen(window: QWidget, screen: QScreen) -> None:
+    def attach_window_to_screen(self, window: QWidget, screen: QScreen) -> None:
         handle = window.windowHandle()
         if handle is not None:
             handle.setScreen(screen)
@@ -69,13 +69,11 @@ class PlatformAdapter(ABC):  # noqa: B024
         window.raise_()
         window.activateWindow()
 
-    @staticmethod
-    def detach_window_from_screen(window: QWidget) -> None:
+    def detach_window_from_screen(self, window: QWidget) -> None:
         window.showNormal()
         window.hide()
 
-    @staticmethod
-    def keep_window_in_focus(window: QWidget) -> None:
+    def keep_window_in_focus(self, window: QWidget) -> None:
         if window.isVisible():
             window.raise_()
             window.activateWindow()
