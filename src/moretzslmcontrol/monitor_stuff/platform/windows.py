@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from moretzslmcontrol.userinterface.platform import PlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 
 # imports here
 

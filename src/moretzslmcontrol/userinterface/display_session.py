@@ -7,16 +7,16 @@ Generated using ChatGPT
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from moretzslmcontrol.control.slm_connector import SlmConnector
+from moretzslmcontrol.external_control.slm_connector import SlmConnector
 from moretzslmcontrol.userinterface.display_bridge import DisplayBridge
 from moretzslmcontrol.userinterface.display_window import DisplayWindow
-from moretzslmcontrol.userinterface.models import SessionState, SessionDebugView
+from moretzslmcontrol.monitor_stuff.models import SessionState, SessionDebugView
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
-    from moretzslmcontrol.userinterface.platform.base import PlatformAdapter
-    from moretzslmcontrol.userinterface.models import MonitorRecord
+    from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
+    from moretzslmcontrol.monitor_stuff.models import MonitorRecord
 
 
 class DisplaySession:

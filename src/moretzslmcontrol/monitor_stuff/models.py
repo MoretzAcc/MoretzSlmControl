@@ -33,8 +33,6 @@ class SessionState(StrEnum):
         raise ValueError(f"Unknown SessionState: {state}")
 
 
-
-
 @dataclass(slots=True)
 class MonitorRecord:
     monitor_id: str
@@ -110,3 +108,20 @@ class ScreenDescriptor:
     geometry_y: int
     physical_size_x: float
     physical_size_y: float
+
+
+@dataclass(slots=True)
+class EdidInfo:
+    manufacturer_id: str
+    manufacturer: str
+    manufacturer_pnp_id: str
+    product_id: str
+    year: str
+    week: str
+    edid_version: str
+    type: str
+    width: str
+    height: str
+    gamma: str
+    name: str
+    serial: str

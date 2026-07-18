@@ -13,7 +13,7 @@ from abc import ABC
 
 from PySide6.QtCore import Qt
 
-from moretzslmcontrol.userinterface.models import ScreenDescriptor
+from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen

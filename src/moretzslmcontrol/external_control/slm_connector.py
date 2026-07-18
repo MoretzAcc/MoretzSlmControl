@@ -17,8 +17,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
-from moretzslmcontrol.userinterface.models import SessionStats
+from moretzslmcontrol.external_control.slm_hero_connector import SlmHeroConnector
+from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.math_util import wrap_phase

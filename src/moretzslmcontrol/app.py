@@ -44,8 +44,8 @@ zenoh.session_manager.update_config(configChanges)
 from PySide6.QtWidgets import QApplication
 
 from moretzslmcontrol.userinterface.main_window import MainWindow
-from moretzslmcontrol.userinterface.monitor_manager import MonitorManager
-from moretzslmcontrol.userinterface.platform import create_platform_adapter
+from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
+from moretzslmcontrol.monitor_stuff.platform import create_platform_adapter
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     ...

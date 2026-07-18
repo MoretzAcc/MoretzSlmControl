@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING
 
 import platform as _platform
 
-from moretzslmcontrol.userinterface.platform.base import PlatformAdapter
-from moretzslmcontrol.userinterface.platform.linux import LinuxPlatformAdapter
-from moretzslmcontrol.userinterface.platform.windows import WindowsPlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform.linux import LinuxPlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform.windows import WindowsPlatformAdapter
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     ...

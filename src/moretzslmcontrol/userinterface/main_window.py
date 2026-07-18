@@ -20,11 +20,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from moretzslmcontrol.userinterface.models import SessionState
+from moretzslmcontrol.monitor_stuff.models import SessionState
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
-    from moretzslmcontrol.userinterface.monitor_manager import MonitorManager
-    from moretzslmcontrol.userinterface.models import SessionDebugView
+    from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
+    from moretzslmcontrol.monitor_stuff.models import SessionDebugView
 
 
 class MainWindow(QMainWindow):

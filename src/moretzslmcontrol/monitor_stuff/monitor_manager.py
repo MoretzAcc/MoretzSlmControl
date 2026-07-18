@@ -10,14 +10,14 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 
 from moretzslmcontrol.userinterface.display_session import DisplaySession
-from moretzslmcontrol.userinterface.models import MonitorRecord, SessionDebugView, SessionState
+from moretzslmcontrol.monitor_stuff.models import MonitorRecord, SessionDebugView, SessionState
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
     from PySide6.QtWidgets import QApplication
-    from moretzslmcontrol.userinterface.platform.base import PlatformAdapter
-    from moretzslmcontrol.control.slm_connector import SlmConnector
+    from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
+    from moretzslmcontrol.external_control.slm_connector import SlmConnector
 
 
 class MonitorManager(QObject):

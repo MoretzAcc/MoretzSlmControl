@@ -11,7 +11,7 @@ import logging
 from heros import LocalHERO
 
 if TYPE_CHECKING:
-    from moretzslmcontrol.control.slm_connector import SlmConnector
+    from moretzslmcontrol.external_control.slm_connector import SlmConnector
 
 logger = logging.getLogger(__name__)
 

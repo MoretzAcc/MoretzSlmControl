@@ -15,8 +15,8 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
-    from moretzslmcontrol.control.slm_connector import SlmConnector
-    from moretzslmcontrol.userinterface.platform.base import PlatformAdapter
+    from moretzslmcontrol.external_control.slm_connector import SlmConnector
+    from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
 
 
 
