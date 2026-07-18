@@ -15,6 +15,7 @@ from typing import Any
 from dataclasses import dataclass
 
 import pyedid
+from pyedid import Edid
 
 if TYPE_CHECKING:
     ...
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class LinuxMonitor:
     connector_name: str
-    edid: Any
+    edid: bytes
+    parsed_edid: Edid
 
 
 def get_linux_edids() -> list[LinuxMonitor]:
@@ -81,7 +83,8 @@ def get_linux_edids() -> list[LinuxMonitor]:
         monitors.append(
             LinuxMonitor(
                 connector_name=connector.name.split("-", maxsplit=1)[1],
-                edid=parsed_edid,
+                edid=edid,
+                parsed_edid=parsed_edid,
             )
         )
 

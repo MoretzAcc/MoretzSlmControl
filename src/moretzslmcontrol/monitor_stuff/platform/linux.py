@@ -48,7 +48,7 @@ class LinuxPlatformAdapter(PlatformAdapter):
             # TODO more checks ?
             return None
 
-        return monitor.edid
+        return monitor.parsed_edid
 
     def refresh_edid_list(self) -> None:
         self.linux_monitors = get_linux_edids()
@@ -56,4 +56,4 @@ class LinuxPlatformAdapter(PlatformAdapter):
     def log_all_edids(self) -> None:
         logger.info("Logging all EDIDs in linux_monitors:")
         for monitor in self.linux_monitors:
-            logger.info(f"EDID for {monitor.connector_name}:\n{monitor.edid}\n\n")
+            logger.info(f"EDID for {monitor.connector_name}:\n{monitor.parsed_edid}\n\n")
