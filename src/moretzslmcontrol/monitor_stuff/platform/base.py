@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # imports here
 
-from abc import ABC, abstractstaticmethod, abstractmethod
+from abc import ABC, abstractmethod
 
 from PySide6.QtCore import Qt
 
@@ -24,11 +24,11 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class PlatformAdapter(ABC):  # noqa: B024
 
     @abstractmethod
-    def get_screen_edids(self, screen: QScreen) -> Edid | None:
+    def get_screen_edids(self, screen: QScreen) -> list[Edid]:
         pass
 
     def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
-        edids = self.get_screen_edids(screen) # TODO what now? put extra info into descriptor? Especially since edid might be None?
+        edids = self.get_screen_edids(screen)
         dpr = screen.devicePixelRatio()
         geometry = screen.geometry()
         width = round(geometry.width() * dpr)
@@ -39,9 +39,9 @@ class PlatformAdapter(ABC):  # noqa: B024
             or f"{screen.name()}_{width}x{height}_{screen.physicalSize().width()}mm_{screen.physicalSize().height()}mm"
         )
         descriptor = ScreenDescriptor(
-            monitor_id=monitor_id,
+            monitor_uid=monitor_id,
             serial_number=serial_number,
-            connector_name=screen.name().strip(),
+            screen_name=screen.name().strip(),
             manufacturer=screen.manufacturer().strip(),
             model=screen.model().strip(),
             port_name="",
@@ -52,6 +52,7 @@ class PlatformAdapter(ABC):  # noqa: B024
             geometry_y=geometry.y(),
             physical_size_x=screen.physicalSize().width(),
             physical_size_y=screen.physicalSize().height(),
+            associated_monitors=edids,
         )
         return descriptor
 

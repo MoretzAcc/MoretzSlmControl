@@ -8,10 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pyedid
 from PySide6.QtGui import QScreen
 
-from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 from pyedid import Edid
 

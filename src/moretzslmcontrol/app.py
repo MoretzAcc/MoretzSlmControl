@@ -57,7 +57,7 @@ def run(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv
     app = QApplication(argv)
-    platform_adapter = create_platform_adapter()
+    platform_adapter = create_platform_adapter(app.platformName())
     monitor_manager = MonitorManager(app=app, platform_adapter=platform_adapter)
     main_window = MainWindow(monitor_manager=monitor_manager)
     main_window.show()

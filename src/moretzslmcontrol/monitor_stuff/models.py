@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 from dataclasses import dataclass
 from enum import StrEnum
 
-if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
-    ...
+if TYPE_CHECKING:
+    from pyedid import Edid
 
 
 class SessionState(StrEnum):
@@ -95,11 +95,11 @@ class SessionDebugView:
 
 @dataclass(slots=True)
 class ScreenDescriptor:
-    monitor_id: str
-    serial_number: str
-    connector_name: str # QScreen.name is connector name for linux, arbitrary for windows tho
-    manufacturer: str
-    model: str
+    monitor_uid: str
+    serial_number: str # Obsolete through edid
+    screen_name: str # QScreen.name is connector name for linux, arbitrary for windows tho
+    manufacturer: str # Obsolete through edid
+    model: str # Obsolete through edid
     port_name: str
     width: int
     height: int
@@ -108,3 +108,28 @@ class ScreenDescriptor:
     geometry_y: int
     physical_size_x: float
     physical_size_y: float
+    associated_monitors: list[Edid]
+
+""" copy here for reference
+
+class Edid(NamedTuple):
+    '''Parsed EDID object'''
+    manufacturer_id: int
+    manufacturer: str
+    manufacturer_pnp_id: str
+    product_id: int
+    year: int
+    week: int
+    edid_version: str
+    type: str
+    width: float
+    height: float
+    gamma: float
+    dpms_standby: bool
+    dpms_suspend: bool
+    dpms_activeoff: bool
+    resolutions: List[Tuple[int, int, float]]
+    name: Optional[str]
+    serial: Union[str, int]
+
+"""

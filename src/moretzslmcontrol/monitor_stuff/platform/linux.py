@@ -7,6 +7,7 @@ Generated using ChatGPT
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QScreen
@@ -15,7 +16,7 @@ from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 from pyedid import Edid
 
-from moretzslmcontrol.monitor_stuff.platform.linux_edid import get_linux_edids, LinuxMonitor
+from moretzslmcontrol.monitor_stuff.platform.linux_edid.get_all import get_linux_edids, LinuxMonitor
 
 if TYPE_CHECKING:
     ...
@@ -24,11 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 class LinuxPlatformAdapter(PlatformAdapter):
-    def __init__(self) -> None:
+    def __init__(self, qt_backend: str) -> None:
+        self.qt_backend = qt_backend
+        self.desktop_environment = os.environ.get("XDG_CURRENT_DESKTOP")
+        self.session = os.environ.get("XDG_SESSION_TYPE")
         self.linux_monitors: list[LinuxMonitor] = []
         super().__init__()
 
-    def get_screen_edids(self, screen: QScreen) -> Edid | None:
+    def get_screen_edids(self, screen: QScreen) -> list[Edid]:
         name = screen.name()
 
         monitor = next(
@@ -48,9 +52,9 @@ class LinuxPlatformAdapter(PlatformAdapter):
         if monitor is None:
             logger.error(f"Could not find EDID for connector {name}")
             # TODO more checks ?
-            return None
+            return []
 
-        return monitor.parsed_edid
+        return [monitor.parsed_edid]
 
     def refresh_edid_list(self) -> None:
         self.linux_monitors = get_linux_edids()

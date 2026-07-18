@@ -39,14 +39,14 @@ class MonitorManager(QObject):
         current_ids: set[str] = set()
         for screen in self._app.screens():
             descriptor = self._platform_adapter.describe_screen(screen)
-            current_ids.add(descriptor.monitor_id)
-            self._known_screens[descriptor.monitor_id] = screen
-            record = self._records_by_id.get(descriptor.monitor_id)
+            current_ids.add(descriptor.monitor_uid)
+            self._known_screens[descriptor.monitor_uid] = screen
+            record = self._records_by_id.get(descriptor.monitor_uid)
             if record is None:
                 record = MonitorRecord(
-                    monitor_id=descriptor.monitor_id,
+                    monitor_id=descriptor.monitor_uid,
                     serial_number=descriptor.serial_number,
-                    screen_name=descriptor.connector_name,
+                    screen_name=descriptor.screen_name,
                     manufacturer=descriptor.manufacturer,
                     model=descriptor.model,
                     port_name=descriptor.port_name,
@@ -59,10 +59,10 @@ class MonitorManager(QObject):
                     refresh_rate=descriptor.refresh_rate,
                     is_connected=True,
                 )
-                self._records_by_id[descriptor.monitor_id] = record
+                self._records_by_id[descriptor.monitor_uid] = record
             else:
                 record.serial_number = descriptor.serial_number
-                record.screen_name = descriptor.connector_name
+                record.screen_name = descriptor.screen_name
                 record.manufacturer = descriptor.manufacturer
                 record.model = descriptor.model
                 record.port_name = descriptor.port_name
@@ -72,7 +72,7 @@ class MonitorManager(QObject):
                 record.geometry_y = descriptor.geometry_y
                 record.is_connected = True
 
-            session = self._sessions_by_id.get(descriptor.monitor_id)
+            session = self._sessions_by_id.get(descriptor.monitor_uid)
             if session is not None:
                 session.attach_screen(screen)
 
@@ -156,12 +156,12 @@ class MonitorManager(QObject):
 
     def _on_screen_added(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
-        self._known_screens[descriptor.monitor_id] = screen
+        self._known_screens[descriptor.monitor_uid] = screen
         self.rescan_screens()
 
     def _on_screen_removed(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
-        monitor_id = descriptor.monitor_id
+        monitor_id = descriptor.monitor_uid
         record = self._records_by_id.get(monitor_id)
         if record is not None:
             record.is_connected = False

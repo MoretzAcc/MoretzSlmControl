@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import ctypes
 from ctypes import wintypes
-from dataclasses import dataclass
 
 
 if TYPE_CHECKING:

@@ -29,7 +29,6 @@ class LinuxMonitor:
     edid: bytes
     parsed_edid: Edid
 
-
 def get_linux_edids() -> list[LinuxMonitor]:
     if not sys.platform.startswith("linux"):
         raise OSError("This function only works on Linux.")
