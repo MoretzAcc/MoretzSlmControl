@@ -45,6 +45,7 @@ class LinuxPlatformAdapter(PlatformAdapter):
 
         if monitor is None:
             logger.error(f"Could not find EDID for connector {name}")
+            # TODO more checks ?
             return None
 
         return monitor.edid

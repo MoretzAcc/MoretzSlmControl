@@ -66,7 +66,9 @@ def get_linux_edids() -> list[LinuxMonitor]:
             continue
 
         if not edid:
-            logger.warning(f"{connector.name}: Connector found but does not provide any EDID.",)
+            logger.warning(
+                f"{connector.name}: Connector found but does not provide any EDID.",
+            )
             continue
 
         try:
@@ -78,7 +80,7 @@ def get_linux_edids() -> list[LinuxMonitor]:
 
         monitors.append(
             LinuxMonitor(
-                connector_name=connector.name,
+                connector_name=connector.name.split("-", maxsplit=1)[1],
                 edid=parsed_edid,
             )
         )
