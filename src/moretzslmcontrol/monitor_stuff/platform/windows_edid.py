@@ -10,6 +10,9 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import pyedid
+from pyedid import Edid
+
 if TYPE_CHECKING:
     ...
 
@@ -20,6 +23,7 @@ logger = logging.getLogger(__name__)
 class WindowsMonitor:
     instance_name: str  # Name as shown by Windows. Nice for debugging, but as I did not find an equivalent in linux, I won't use it.
     edid: bytes  # EDID-Bytes
+    parsed_edid: Edid
     complete: bool  # True, if all blocks were read successfully
 
 
@@ -76,17 +80,25 @@ def request_windows_edids() -> list[WindowsMonitor]:
 
             blocks.append(block)
 
+        combined_edid = b"".join(blocks)
+
+        try:
+            parsed_edid = pyedid.parse_edid(combined_edid)
+        except Exception as error:
+            logger.exception(f"{instance_name}: Unable to parse EDID: {error}")
+            continue
+
         monitors.append(
-            WindowsMonitor(instance_name=instance_name, edid=b"".join(blocks), complete=complete)
+            WindowsMonitor(instance_name=instance_name, edid=combined_edid, parsed_edid=parsed_edid, complete=complete)
         )
 
     return monitors
 
 
 def _read_edid_block(
-    service: Any,  # noqa: ANN401
-    monitor: Any,  # noqa: ANN401
-    block_id: int,
+        service: Any,  # noqa: ANN401
+        monitor: Any,  # noqa: ANN401
+        block_id: int,
 ) -> bytes:
     method_name = "WmiGetMonitorRawEEdidV1Block"
 
