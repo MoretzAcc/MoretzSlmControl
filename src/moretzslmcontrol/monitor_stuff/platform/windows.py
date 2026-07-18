@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pyedid
+
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform.windows_edid import request_windows_edids
+from pyedid import Edid
 
 # imports here
 
@@ -17,6 +21,10 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class WindowsPlatformAdapter(PlatformAdapter):
+    @staticmethod
+    def get_screen_edids() -> list[Edid]:
+        win_monitors = request_windows_edids()
+        return [pyedid.parse_edid(win_monitor.edid) for win_monitor in win_monitors]
 
     def detach_window_from_screen(self, window: QWidget) -> None:
         window.showMinimized()
@@ -24,4 +32,3 @@ class WindowsPlatformAdapter(PlatformAdapter):
 
     def keep_window_in_focus(self, window: QWidget) -> None:
         super().keep_window_in_focus(window)
-

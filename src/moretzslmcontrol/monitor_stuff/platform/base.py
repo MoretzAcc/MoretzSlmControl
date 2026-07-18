@@ -9,11 +9,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # imports here
 
-from abc import ABC
+from abc import ABC, abstractstaticmethod, abstractmethod
 
 from PySide6.QtCore import Qt
 
 from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
+from pyedid import Edid
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
@@ -21,6 +22,12 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class PlatformAdapter(ABC):  # noqa: B024
+    
+    @staticmethod
+    @abstractmethod
+    def get_screen_edids() -> list[Edid]:
+        pass
+
 
     @staticmethod
     def describe_screen(screen: QScreen) -> ScreenDescriptor:

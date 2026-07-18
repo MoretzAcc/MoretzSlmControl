@@ -8,10 +8,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
-
+from pyedid import Edid
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
-    pass
+    ...
 
 class LinuxPlatformAdapter(PlatformAdapter):
-    pass
+
+    @staticmethod
+    def get_screen_edids() -> list[Edid]:
+        # TODO
+        pass
