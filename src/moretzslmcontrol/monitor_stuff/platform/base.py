@@ -24,10 +24,11 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class PlatformAdapter(ABC):  # noqa: B024
 
     @abstractmethod
-    def get_screen_edid(self, descriptor: ScreenDescriptor) -> Edid | None:
+    def get_screen_edids(self, screen: QScreen) -> Edid | None:
         pass
 
     def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
+        edids = self.get_screen_edids(screen) # TODO what now? put extra info into descriptor? Especially since edid might be None?
         dpr = screen.devicePixelRatio()
         geometry = screen.geometry()
         width = round(geometry.width() * dpr)
@@ -52,7 +53,6 @@ class PlatformAdapter(ABC):  # noqa: B024
             physical_size_x=screen.physicalSize().width(),
             physical_size_y=screen.physicalSize().height(),
         )
-        edid = self.get_screen_edid(descriptor) # TODO what now? put extra info into descriptor? Especially since edid might be None?
         return descriptor
 
     def configure_display_window(self, window: QWidget) -> None:

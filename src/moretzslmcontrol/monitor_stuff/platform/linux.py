@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from PySide6.QtGui import QScreen
+
 from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 from pyedid import Edid
@@ -26,8 +28,8 @@ class LinuxPlatformAdapter(PlatformAdapter):
         self.linux_monitors: list[LinuxMonitor] = []
         super().__init__()
 
-    def get_screen_edid(self, descriptor: ScreenDescriptor) -> Edid | None:
-        name = descriptor.connector_name
+    def get_screen_edids(self, screen: QScreen) -> Edid | None:
+        name = screen.name()
 
         monitor = next(
             (x for x in self.linux_monitors if x.connector_name == name),
