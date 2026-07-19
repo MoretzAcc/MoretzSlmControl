@@ -6,6 +6,8 @@ uv run moretzslmcontrol
 
 
 ### TODO 
+- ICON
+- log that session initialized, log that heros activated
 - Connection via Heros toggleable
 - Connection via Rest Api toggleable
 - Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
