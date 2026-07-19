@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO will ich diese function wirklich hier haben? Will ich sie überhaupt haben?
-
 def pixelResizeArray[T: np.generic](array: NDArray[T], targetShape: tuple[int, int], acceptableRatio: float = 1.2, defaultValue: int=128) -> NDArray[T] | None:
     targetH, targetW = targetShape
     h, w = array.shape

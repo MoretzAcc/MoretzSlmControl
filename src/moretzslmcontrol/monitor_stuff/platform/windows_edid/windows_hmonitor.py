@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 MONITOR_DEFAULTTONEAREST = 2
 
-user32 = ctypes.WinDLL("user32", use_last_error=True) # TODO is this okay?
+user32 = ctypes.WinDLL("user32", use_last_error=True)
 
 class POINT(ctypes.Structure):
     _fields_ = [
