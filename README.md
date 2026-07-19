@@ -10,6 +10,11 @@ Tested on:
 - Fedora 44 KDE Wayland
 - Ubuntu 24.04 GNOME Wayland
 
+Using Spatial Light Modulators from:
+
+- Holoeye
+- Hamamatsu
+
 ## Requirements
 
 - Python 3.14 or newer
