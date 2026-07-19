@@ -4,19 +4,20 @@ This repository is a Python GUI application for controlling SLM displays. It use
 
 ## Project shape
 
-- Package root: `src/moretzslmcontrol`
+- Server package root: `src/moretzslmcontrol`
+- Client package root: `client/src/moretzslmclient`
 - App entrypoint: `src/moretzslmcontrol/app.py`
 - UI layer: `src/moretzslmcontrol/userinterface`
 - Monitor/platform integration: `src/moretzslmcontrol/monitor_stuff`
-- External SLM control: `src/moretzslmcontrol/external_control`
+- External SLM control: `src/moretzslmcontrol/control`
 - Utility helpers: `src/moretzslmcontrol/util`
-- API experiments/integration: `src/api`
 - Templates/examples: `src/templates`
 
 ## Environment
 
 - Python requirement: `>=3.14`
 - Dependency manager: `uv`
+- Client Python requirement: `>=3.11`
 - Main app run command:
 
 ```bash
@@ -37,6 +38,12 @@ uv run moretzslmcontrol
 uv run ruff check .
 ```
 
+- Check the standalone client package:
+
+```bash
+uv run ruff check client/src
+```
+
 - Format check is not configured separately in this repo. Do not assume auto-formatting is in place.
 
 ## Current repo realities
@@ -44,7 +51,7 @@ uv run ruff check .
 - There is no test suite in the repository yet.
 - The application is GUI-first; many changes are best verified by running the app.
 - Platform-specific monitor code exists for Linux and Windows under `monitor_stuff/platform`.
-- README is still sparse and contains TODOs rather than full usage documentation.
+- The client package must remain independent of GUI, monitor, and SLM-server modules; it may depend only on its own code, HEROS, and NumPy.
 
 ## Coding expectations for agents
 
