@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCloseEvent, QImage, QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
@@ -21,6 +21,8 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class DisplayWindow(QWidget):
+    closed = Signal()
+
     def __init__(self, session_id: str, displayer: HologramManager, platform_adapter: PlatformAdapter) -> None:
         super().__init__(None)
         self._session_id = session_id
@@ -48,6 +50,10 @@ class DisplayWindow(QWidget):
     def detach_from_screen(self) -> None:
         self._attachedScreen = None
         self._platform_adapter.detach_window_from_screen(self)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        event.accept()
+        self.closed.emit()
 
     def on_frame_available(self, session_id: str, revision: int) -> None:
         if session_id != self._session_id:

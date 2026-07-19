@@ -5,19 +5,22 @@ Date: 23.03.2026
 
 from __future__ import annotations
 
+import logging
+from html import escape
 from pathlib import Path
+from threading import Thread
 from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
+    QApplication,
     QFormLayout,
     QFileDialog,
     QFrame,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -37,11 +40,14 @@ from moretzslmcontrol.monitor_stuff.models import SessionState
 from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
+from moretzslmcontrol.util.pattern_modification import makeSlmPhaseForSingleFocalSpot
 
 if TYPE_CHECKING:
     from moretzslmcontrol.monitor_stuff.models import SessionDebugView
     from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
+    from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 
+logger = logging.getLogger(__name__)
 
 class MainWindow(QMainWindow):
     """Presentation-only control surface for the known SLM displays."""
@@ -55,11 +61,17 @@ class MainWindow(QMainWindow):
         self._loaded_pattern_paths: dict[str, dict[str, str]] = {}
         self._pattern_path_fields: dict[str, QLineEdit] = {}
         self._preview_labels: dict[str, QLabel] = {}
+        self._shift_sliders: dict[str, QSlider] = {}
+        self._shift_inputs: dict[str, QLineEdit] = {}
+        self._modification_parameter_fields: dict[str, QLineEdit] = {}
+        self._last_modification_parameters: dict[str, tuple[float, ...]] = {}
+        self._pattern_active_checks: dict[str, QCheckBox] = {}
+        self._pattern_flip_checks: dict[tuple[str, str], QCheckBox] = {}
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
 
         self.setWindowTitle("SLM Display Control")
-        self.resize(1350, 880)
-        self.setMinimumSize(1120, 780)
+        self.resize(1550, 880)
+        self.setMinimumSize(1280, 780)
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
@@ -108,6 +120,13 @@ class MainWindow(QMainWindow):
             self._list_widget.setCurrentRow(0)
         self._update_selected_screen()
 
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Exit the application even when fullscreen SLM output windows remain open."""
+        logger.info("Closing application")
+        self._monitor_manager.shutdown()
+        event.accept()
+        QApplication.quit()
+
     def _build_empty_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -126,72 +145,85 @@ class MainWindow(QMainWindow):
         title_row = QHBoxLayout()
         self._screen_title = QLabel("Screen settings")
         self._screen_title.setStyleSheet("font-size: 20px; font-weight: 600;")
-        self._screen_status = QLabel()
+        self._slm_window_button = QPushButton()
+        self._slm_window_button.setFixedHeight(52)
+        self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
-        title_row.addWidget(self._screen_status)
-        title_row.addWidget(QPushButton("Enable / disable SLM window"))
         page_layout.addLayout(title_row)
 
         information_row = QHBoxLayout()
         information_row.setSpacing(12)
-        information_row.addWidget(self._build_screen_information_group(), 2)
-        information_row.addWidget(self._build_monitor_information_group(), 3)
-        information_row.addWidget(self._build_session_information_group(), 3)
+        screen_information = self._build_screen_information_group()
+        screen_information.setMinimumWidth(360)
+        information_row.addWidget(screen_information)
+        information_row.addWidget(self._build_monitor_information_group(), 1)
         page_layout.addLayout(information_row)
-        page_layout.addWidget(self._build_pattern_group(), 1)
+        page_layout.addWidget(self._build_pattern_group(), 2)
         page_layout.addWidget(self._build_console_group())
         return page
 
     def _build_screen_information_group(self) -> QGroupBox:
         group = QGroupBox("Screen information")
-        form = QFormLayout(group)
+        layout = QFormLayout(group)
         self._screen_info_fields: dict[str, QLabel] = {}
         for key, label in (
-            ("monitor_id", "Screen ID"),
+            ("display_name", "Display name"),
+            ("screen_name", "Screen name"),
             ("resolution", "Resolution"),
-            ("physical_size", "Physical size"),
-            ("refresh_rate", "Refresh rate"),
+            ("screen_uid", "Screen UID"),
+            ("heros_name", "Hero name"),
+            ("screen_connection", "Screen connection"),
+            ("slm_window", "SLM window"),
         ):
             value = self._new_information_label()
+            value.setWordWrap(True)
             self._screen_info_fields[key] = value
-            form.addRow(f"{label}:", value)
+            layout.addRow(f"{label}:", value)
         return group
 
     def _build_monitor_information_group(self) -> QGroupBox:
-        group = QGroupBox("Associated monitors (up to 3)")
-        layout = QVBoxLayout(group)
-        self._associated_monitor_labels: list[QLabel] = []
+        group = QGroupBox("Associated monitors")
+        layout = QHBoxLayout(group)
+        self._no_associated_monitors_label = QLabel("No associated monitors detected")
+        layout.addWidget(self._no_associated_monitors_label)
+        self._associated_monitor_cards: list[QFrame] = []
+        self._associated_monitor_titles: list[QLabel] = []
+        self._associated_monitor_fields: list[dict[str, QLabel]] = []
         for index in range(self._MAX_ASSOCIATED_MONITORS):
-            label = QLabel(f"Monitor {index + 1}: no monitor information available")
-            label.setFrameShape(QFrame.Shape.StyledPanel)
-            label.setMinimumHeight(28)
-            label.setMargin(6)
-            self._associated_monitor_labels.append(label)
-            layout.addWidget(label)
-        return group
+            card = QFrame()
+            card.setFrameShape(QFrame.Shape.StyledPanel)
+            card.setMinimumWidth(250)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(8, 6, 8, 6)
+            title = QLabel(f"Monitor {index + 1}")
+            title.setStyleSheet("font-weight: 600;")
+            card_layout.addWidget(title)
 
-    def _build_session_information_group(self) -> QGroupBox:
-        group = QGroupBox("SLM session")
-        layout = QGridLayout(group)
-        self._session_info_fields: dict[str, QLabel] = {}
-        for index, (key, label) in enumerate(
-            (
-                ("heros_name", "Hero name"),
-                ("status", "Status"),
-                ("submitted_count", "Submitted"),
-                ("accepted_count", "Accepted"),
-                ("invalid_count", "Invalid"),
-                ("displayed_count", "Displayed"),
-                ("latest_revision", "Latest revision"),
-                ("last_displayed_revision", "Displayed revision"),
-            )
-        ):
-            row, column = divmod(index, 2)
-            field = self._new_information_label()
-            self._session_info_fields[key] = field
-            layout.addWidget(QLabel(f"{label}:"), row, column * 2)
-            layout.addWidget(field, row, column * 2 + 1)
+            form = QFormLayout()
+            form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+            form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+            fields: dict[str, QLabel] = {}
+            for key, label in (
+                ("os_identifier", "OS identifier"),
+                ("manufacturer", "Manufacturer"),
+                ("product_id", "Product ID"),
+                ("manufactured", "Year / Week"),
+                ("name", "Name"),
+                ("serial", "Serial"),
+            ):
+                value = self._new_information_label()
+                value.setWordWrap(True)
+                value.setMinimumWidth(145)
+                fields[key] = value
+                form.addRow(f"{label}:", value)
+            card_layout.addLayout(form)
+            card.hide()
+            self._associated_monitor_cards.append(card)
+            self._associated_monitor_titles.append(title)
+            self._associated_monitor_fields.append(fields)
+            layout.addWidget(card, 1)
+        layout.addStretch()
         return group
 
     def _build_pattern_group(self) -> QGroupBox:
@@ -219,7 +251,7 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self._build_operator_label("="))
         layout.addWidget(
-            self._build_pattern_component("Total hologram", component_key="total", has_apply_button=True),
+            self._build_pattern_component("Total hologram", component_key="total"),
             1,
         )
         return group
@@ -231,7 +263,6 @@ class MainWindow(QMainWindow):
         component_key: str | None = None,
         has_file_selector: bool = False,
         has_shift_controls: bool = False,
-        has_apply_button: bool = False,
     ) -> QWidget:
         component = QWidget()
         layout = QVBoxLayout(component)
@@ -244,21 +275,24 @@ class MainWindow(QMainWindow):
 
         preview = QLabel("Preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        preview.setFrameShape(QFrame.Shape.StyledPanel)
         preview.setFixedHeight(90)
-        preview.setStyleSheet("background: #4a4a4a; color: #d0d0d0;")
+        preview.setStyleSheet("color: #d0d0d0;")
         if component_key is not None:
             self._preview_labels[component_key] = preview
         layout.addWidget(preview)
 
-        if has_apply_button:
-            layout.addWidget(QPushButton("Apply pattern"))
-            layout.addStretch()
-            return component
-
-        enabled = QCheckBox("Active")
-        enabled.setChecked(True)
-        layout.addWidget(enabled)
+        if component_key != "total":
+            enabled = QCheckBox("Active")
+            enabled.setChecked(True)
+            if component_key is not None:
+                self._pattern_active_checks[component_key] = enabled
+                enabled.toggled.connect(
+                    lambda is_active, key=component_key: self._set_pattern_active(key, is_active)
+                )
+            layout.addWidget(enabled)
+        else:
+            layout.addSpacing(24)
+            layout.addWidget(self._slm_window_button)
 
         if has_file_selector:
             if component_key is None:
@@ -274,9 +308,23 @@ class MainWindow(QMainWindow):
             file_row.addWidget(file_button)
             layout.addLayout(file_row)
 
+            flip_row = QHBoxLayout()
+            for direction, label in (("horizontal", "Flip horizontal"), ("vertical", "Flip vertical")):
+                checkbox = QCheckBox(label)
+                self._pattern_flip_checks[(component_key, direction)] = checkbox
+                checkbox.toggled.connect(
+                    lambda is_flipped, key=component_key, flip_direction=direction: self._set_pattern_flip(
+                        key, flip_direction, is_flipped
+                    )
+                )
+                flip_row.addWidget(checkbox)
+            flip_row.addStretch()
+            layout.addLayout(flip_row)
+
         if has_shift_controls:
             for axis in ("X", "Y", "Z"):
                 layout.addLayout(self._build_shift_row(axis))
+            layout.addLayout(self._build_modification_parameter_fields())
 
         layout.addStretch()
         return component
@@ -365,6 +413,63 @@ class MainWindow(QMainWindow):
         self._write_console(f"Applied {component_name} to the SLM session.")
         self.updatePreview()
 
+    def _set_pattern_active(self, component_key: str, is_active: bool) -> None:
+        monitor_id = self._selected_monitor_id()
+        if monitor_id is None:
+            return
+        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        if displayer is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+
+        if component_key == "base":
+            displayer.enableCorrectionPattern(is_active, update=False)
+            component_name = "base aberration"
+        elif component_key == "hologram":
+            displayer.enableHologramPattern(is_active, update=False)
+            component_name = "hologram"
+        elif component_key == "modification":
+            displayer.enableModificationPattern(is_active, update=False)
+            component_name = "modification"
+        else:
+            raise ValueError(f"Unknown pattern component: {component_key}")
+
+        state = "enabled" if is_active else "disabled"
+        self._write_console(f"{component_name.capitalize()} pattern {state}.")
+        self.updatePreview()
+        Thread(target=displayer.publishCurrentPattern, daemon=True).start()
+
+    def _set_pattern_flip(self, component_key: str, direction: str, is_flipped: bool) -> None:
+        monitor_id = self._selected_monitor_id()
+        if monitor_id is None:
+            return
+        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        if displayer is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+
+        if component_key == "base":
+            setter = (
+                displayer.setFlipCorrectionPatternHorizontally
+                if direction == "horizontal"
+                else displayer.setFlipCorrectionPatternVertically
+            )
+            component_name = "base aberration"
+        elif component_key == "hologram":
+            setter = (
+                displayer.setFlipHologramPatternHorizontally
+                if direction == "horizontal"
+                else displayer.setFlipHologramPatternVertically
+            )
+            component_name = "hologram"
+        else:
+            raise ValueError(f"Unsupported flip component: {component_key}")
+
+        setter(is_flipped, update=False)
+        state = "enabled" if is_flipped else "disabled"
+        self._write_console(f"{direction.capitalize()} flip for {component_name} {state}.")
+        Thread(target=displayer.publishCurrentPattern, daemon=True).start()
+
     def updatePreview(self) -> None:
         """Update the bounded grayscale previews for the selected screen's patterns."""
         monitor_id = self._selected_monitor_id()
@@ -382,13 +487,23 @@ class MainWindow(QMainWindow):
                 strict=True,
             )
         )
+        correction_active, hologram_active, modification_active = displayer.getPatternInclusion()
+        active_by_component = {
+            "base": correction_active,
+            "hologram": hologram_active,
+            "modification": modification_active,
+            "total": True,
+        }
         for component_key, pattern in patterns.items():
-            self._set_preview_image(self._preview_labels[component_key], pattern)
+            self._set_preview_image(
+                self._preview_labels[component_key], pattern, active=active_by_component[component_key]
+            )
 
     @staticmethod
-    def _set_preview_image(preview: QLabel, pattern: NDArray[np.float32]) -> None:
-        image_bytes = phaseToByte(np.ascontiguousarray(pattern, dtype=np.float32))
-        height, width = image_bytes.shape
+    def _set_preview_image(
+        preview: QLabel, pattern: NDArray[np.float32], *, active: bool = True
+    ) -> None:
+        height, width = pattern.shape
         max_width = max(1, min(preview.width(), 240))
         max_height = max(1, min(preview.height(), 90))
         scale = min(max_width / width, max_height / height, 1.0)
@@ -396,7 +511,11 @@ class MainWindow(QMainWindow):
         target_height = max(1, round(height * scale))
         row_indices = np.linspace(0, height - 1, target_height, dtype=np.intp)
         column_indices = np.linspace(0, width - 1, target_width, dtype=np.intp)
-        preview_bytes = np.ascontiguousarray(image_bytes[row_indices][:, column_indices])
+        if active:
+            preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
+            preview_bytes = phaseToByte(preview_phase)
+        else:
+            preview_bytes = np.full((target_height, target_width), 128, dtype=np.uint8)
         image = QImage(
             preview_bytes.data,
             target_width,
@@ -407,22 +526,208 @@ class MainWindow(QMainWindow):
         preview.setPixmap(QPixmap.fromImage(image))
 
     def _write_console(self, message: str) -> None:
-        self._console.append(message)
+        if message.startswith("Error"):
+            color = "#d32f2f"
+        elif message.startswith("Warning"):
+            color = "#ef6c00"
+        else:
+            color = "#2e7d32"
+        self._console.append(f'<span style="color: {color};">{escape(message)}</span>')
 
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(4)
-        axis_label = QLabel(axis)
-        axis_label.setMinimumWidth(14)
         slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(-100, 100)
+        slider.setRange(-200, 200)
         value_input = QLineEdit("0")
         value_input.setMaximumWidth(46)
         value_input.setAlignment(Qt.AlignmentFlag.AlignRight)
-        row.addWidget(axis_label)
+        value_input.setValidator(QDoubleValidator(value_input))
+        unit_label = QLabel("µm")
+        self._shift_sliders[axis] = slider
+        self._shift_inputs[axis] = value_input
+        slider.sliderReleased.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
+        value_input.editingFinished.connect(
+            lambda selected_axis=axis: self._on_shift_input_edited(selected_axis)
+        )
+        row.addWidget(QLabel(f"{axis}:"))
         row.addWidget(slider, 1)
         row.addWidget(value_input)
+        row.addWidget(unit_label)
         return row
+
+    def _build_modification_parameter_fields(self) -> QFormLayout:
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        for key, label, default_value, unit, _tooltip in (
+            (
+                "max_shift",
+                "Slider max shift",
+                "200",
+                "µm",
+                "Sets the X, Y, and Z slider range. It does not change the generated pattern by itself.",
+            ),
+            (
+                "wavelength",
+                "Wavelength",
+                "850",
+                "nm",
+                "Wavelength of the light used by the SLM system.",
+            ),
+            (
+                "focal_length",
+                "Focal length",
+                "20",
+                "mm",
+                "Focal length of the objective lens.",
+            ),
+            (
+                "magnification",
+                "Magnification",
+                "2",
+                "",
+                "Unitless magnification of the telescope between SLM and objective.",
+            ),
+            (
+                "pixel_pitch",
+                "Pixel pitch",
+                "8",
+                "µm",
+                "Physical SLM pixel pitch; used as both dx and dy for the phase calculation.",
+            ),
+        ):
+            field = QLineEdit(default_value)
+            field.setMaximumWidth(70)
+            field.setAlignment(Qt.AlignmentFlag.AlignRight)
+            field.setValidator(QDoubleValidator(field))
+            self._modification_parameter_fields[key] = field
+            if key == "max_shift":
+                field.editingFinished.connect(self._on_max_shift_edited)
+            else:
+                field.editingFinished.connect(self._update_modification_pattern)
+            field_row = QWidget()
+            field_layout = QHBoxLayout(field_row)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(4)
+            field_layout.addWidget(field)
+            if unit:
+                field_layout.addWidget(QLabel(unit))
+            field_layout.addStretch()
+            form.addRow(f"{label}:", field_row)
+        return form
+
+    def _on_shift_slider_released(self, axis: str) -> None:
+        value = self._shift_sliders[axis].value()
+        input_field = self._shift_inputs[axis]
+        input_field.blockSignals(True)
+        input_field.setText(str(value))
+        input_field.blockSignals(False)
+        self._update_modification_pattern()
+
+    def _on_shift_input_edited(self, axis: str) -> None:
+        try:
+            value = float(self._shift_inputs[axis].text())
+            maximum_shift = self._read_positive_modification_parameter("max_shift")
+        except ValueError as error:
+            self._write_console(f"Error: invalid {axis} shift: {error}")
+            return
+
+        clamped_value = max(-maximum_shift, min(maximum_shift, value))
+        input_field = self._shift_inputs[axis]
+        input_field.setText(self._format_number(clamped_value))
+        slider = self._shift_sliders[axis]
+        slider.blockSignals(True)
+        slider.setValue(round(clamped_value))
+        slider.blockSignals(False)
+        self._update_modification_pattern()
+
+    def _on_max_shift_edited(self) -> None:
+        try:
+            maximum_shift = self._read_positive_modification_parameter("max_shift")
+        except ValueError as error:
+            self._write_console(f"Error: invalid slider max shift: {error}")
+            return
+
+        try:
+            current_values = {
+                axis: float(input_field.text()) for axis, input_field in self._shift_inputs.items()
+            }
+        except ValueError as error:
+            self._write_console(f"Error: invalid shift value: {error}")
+            return
+
+        slider_limit = round(maximum_shift)
+        for axis, slider in self._shift_sliders.items():
+            slider.blockSignals(True)
+            slider.setRange(-slider_limit, slider_limit)
+            slider.blockSignals(False)
+            current_value = current_values[axis]
+            clamped_value = max(-maximum_shift, min(maximum_shift, current_value))
+            self._shift_inputs[axis].setText(self._format_number(clamped_value))
+            slider.blockSignals(True)
+            slider.setValue(round(clamped_value))
+            slider.blockSignals(False)
+        self._update_modification_pattern()
+
+    def _update_modification_pattern(self) -> None:
+        monitor_id = self._selected_monitor_id()
+        if monitor_id is None:
+            return
+
+        try:
+            x = float(self._shift_inputs["X"].text())
+            y = float(self._shift_inputs["Y"].text())
+            z = float(self._shift_inputs["Z"].text())
+            wavelength = self._read_positive_modification_parameter("wavelength")
+            focal_length = self._read_positive_modification_parameter("focal_length")
+            magnification = self._read_positive_modification_parameter("magnification")
+            pixel_pitch = self._read_positive_modification_parameter("pixel_pitch")
+        except ValueError as error:
+            self._write_console(f"Error: invalid modification parameter: {error}")
+            return
+
+        parameters = (x, y, z, wavelength, focal_length, magnification, pixel_pitch)
+        if self._last_modification_parameters.get(monitor_id) == parameters:
+            return
+
+        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        if displayer is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+        height, width = displayer.shape
+        try:
+            pattern = makeSlmPhaseForSingleFocalSpot(
+                x=x * 1e-6,
+                y=y * 1e-6,
+                z=z * 1e-6,
+                wavelength=wavelength * 1e-9,
+                f_objective=focal_length * 1e-3,
+                magnification=magnification,
+                Nx=width,
+                Ny=height,
+                dx=pixel_pitch * 1e-6,
+                dy=pixel_pitch * 1e-6,
+            )
+            displayer.setModificationPattern(pattern)
+        except PatternSizeMismatchError as error:
+            self._write_console(f"Error: could not apply modification pattern: {error}")
+            return
+        except Exception as error:
+            self._write_console(f"Error: could not generate modification pattern: {error}")
+            return
+
+        self._last_modification_parameters[monitor_id] = parameters
+        self.updatePreview()
+
+    def _read_positive_modification_parameter(self, key: str) -> float:
+        value = float(self._modification_parameter_fields[key].text())
+        if value <= 0:
+            raise ValueError(f"{key.replace('_', ' ')} must be greater than zero")
+        return value
+
+    @staticmethod
+    def _format_number(value: float) -> str:
+        return f"{value:g}"
 
     def _build_console_group(self) -> QGroupBox:
         group = QGroupBox("Console")
@@ -453,33 +758,128 @@ class MainWindow(QMainWindow):
             return
 
         self._content_stack.setCurrentWidget(self._details_page)
-        self._screen_title.setText(view.screen_name or "Unnamed screen")
-        status = SessionState.to_string(view.state)
-        self._screen_status.setText(status)
+        self._screen_title.setText(view.display_name or "Unnamed screen")
+        self._update_slm_window_button(view.state)
+        record = self._monitor_manager.get_screen_record(monitor_id)
+        associated_monitors = record.associated_monitors if record is not None else []
+        self._no_associated_monitors_label.setVisible(not associated_monitors)
+        for index, card in enumerate(self._associated_monitor_cards):
+            if index < len(associated_monitors):
+                self._set_associated_monitor_card(index, associated_monitors[index])
+                card.show()
+            else:
+                card.hide()
         pattern_paths = self._loaded_pattern_paths.get(monitor_id, {})
         for component_key, path_field in self._pattern_path_fields.items():
             file_path = pattern_paths.get(component_key, "")
             path_field.setText(Path(file_path).name if file_path else "")
             path_field.setToolTip(file_path)
         for key, value in {
-            "monitor_id": view.monitor_id,
+            "display_name": view.display_name or "—",
+            "screen_name": view.screen_name or "—",
             "resolution": view.resolution,
-            "physical_size": view.physical_size,
-            "refresh_rate": view.refresh_rate,
+            "screen_uid": view.screen_uid,
+            "heros_name": view.heros_name or "—",
+            "screen_connection": self._screen_connection_text(view.state),
+            "slm_window": self._slm_window_text(view.state),
         }.items():
             self._screen_info_fields[key].setText(value)
-        for key, value in {
-            "heros_name": view.heros_name or "—",
-            "status": status,
-            "submitted_count": str(view.submitted_count),
-            "accepted_count": str(view.accepted_count),
-            "invalid_count": str(view.invalid_count),
-            "displayed_count": str(view.displayed_count),
-            "latest_revision": str(view.latest_revision),
-            "last_displayed_revision": str(view.last_displayed_revision),
-        }.items():
-            self._session_info_fields[key].setText(value)
+        self._sync_pattern_active_checks(monitor_id)
+        self._sync_pattern_flip_checks(monitor_id)
         self.updatePreview()
+
+    def _sync_pattern_active_checks(self, monitor_id: str) -> None:
+        displayer = self._monitor_manager.get_displayer(monitor_id)
+        inclusion = displayer.getPatternInclusion() if displayer is not None else (True, True, True)
+        for component_key, is_active in zip(
+            ("base", "hologram", "modification"), inclusion, strict=True
+        ):
+            checkbox = self._pattern_active_checks[component_key]
+            checkbox.blockSignals(True)
+            checkbox.setChecked(is_active)
+            checkbox.blockSignals(False)
+
+    def _sync_pattern_flip_checks(self, monitor_id: str) -> None:
+        displayer = self._monitor_manager.get_displayer(monitor_id)
+        flip_states = (
+            displayer.getPatternFlipStates() if displayer is not None else (False, False, False, False, False, False)
+        )
+        states_by_control = dict(
+            zip(
+                (
+                    ("base", "horizontal"),
+                    ("base", "vertical"),
+                    ("hologram", "horizontal"),
+                    ("hologram", "vertical"),
+                    ("modification", "horizontal"),
+                    ("modification", "vertical"),
+                ),
+                flip_states,
+                strict=True,
+            )
+        )
+        for control, checkbox in self._pattern_flip_checks.items():
+            checkbox.blockSignals(True)
+            checkbox.setChecked(states_by_control[control])
+            checkbox.blockSignals(False)
+
+    def _set_associated_monitor_card(self, index: int, monitor: MonitorEdid) -> None:
+        edid = monitor.parsed_edid
+        self._associated_monitor_titles[index].setText(f"Monitor {index + 1}")
+        fields = self._associated_monitor_fields[index]
+        fields["os_identifier"].setText(monitor.os_identifier or "—")
+        fields["manufacturer"].setText(
+            f"{edid.manufacturer or '—'} ({edid.manufacturer_pnp_id or '—'})"
+        )
+        fields["product_id"].setText(str(edid.product_id))
+        fields["manufactured"].setText(f"{edid.year}/{edid.week}")
+        fields["name"].setText(edid.name or "—")
+        fields["serial"].setText(str(edid.serial) if edid.serial is not None else "—")
+
+    @staticmethod
+    def _screen_connection_text(state: SessionState) -> str:
+        if state in (SessionState.INACTIVE_CONNECTED, SessionState.ACTIVE_CONNECTED):
+            return "Connected"
+        return "Disconnected"
+
+    @staticmethod
+    def _slm_window_text(state: SessionState) -> str:
+        if MainWindow._is_slm_window_enabled(state):
+            return "Enabled"
+        return "Disabled"
+
+    def _update_slm_window_button(self, state: SessionState) -> None:
+        if self._is_slm_window_enabled(state):
+            self._slm_window_button.setText("SLM WINDOW ON  —  Disable")
+            self._slm_window_button.setStyleSheet(
+                "background-color: #1565c0; color: white; font-weight: 700; border-radius: 4px;"
+            )
+        else:
+            self._slm_window_button.setText("SLM WINDOW OFF  —  Enable")
+            self._slm_window_button.setStyleSheet(
+                "background-color: #b71c1c; color: white; font-weight: 700; border-radius: 4px;"
+            )
+
+    @staticmethod
+    def _is_slm_window_enabled(state: SessionState) -> bool:
+        return state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED)
+
+    def _toggle_slm_window(self) -> None:
+        monitor_id = self._selected_monitor_id()
+        if monitor_id is None:
+            self._write_console("Error: select a screen before changing the SLM window")
+            return
+
+        session = self._monitor_manager.get_session(monitor_id)
+        if session is not None and self._is_slm_window_enabled(session.state):
+            self._monitor_manager.deactivate_monitor(monitor_id)
+            self._write_console("SLM window disabled.")
+            return
+
+        if self._monitor_manager.activate_monitor(monitor_id) is None:
+            self._write_console("Error: the selected screen is no longer available")
+            return
+        self._write_console("SLM window enabled.")
 
     def _selected_monitor_id(self) -> str | None:
         item = self._list_widget.currentItem()
@@ -489,8 +889,8 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _build_item_label(view: SessionDebugView) -> str:
-        return view.screen_name or view.monitor_id
+        return view.display_name or view.screen_name or view.monitor_id
 
     @staticmethod
     def _build_item_tooltip(view: SessionDebugView) -> str:
-        return f"{view.resolution} | {SessionState.to_string(view.state)}"
+        return f"{view.resolution} | {view.screen_uid} | {SessionState.to_string(view.state)}"

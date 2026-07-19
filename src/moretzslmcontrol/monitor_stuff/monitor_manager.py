@@ -5,12 +5,13 @@ Generated using ChatGPT
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
 from moretzslmcontrol.userinterface.display_session import DisplaySession
-from moretzslmcontrol.monitor_stuff.models import MonitorRecord, SessionDebugView, SessionState
+from moretzslmcontrol.monitor_stuff.models import ScreenRecord, SessionDebugView, SessionState
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
@@ -27,7 +28,7 @@ class MonitorManager(QObject):
         super().__init__()
         self._app = app
         self._platform_adapter = platform_adapter
-        self._records_by_id: dict[str, MonitorRecord] = {}
+        self._records_by_id: dict[str, ScreenRecord] = {}
         self._sessions_by_id: dict[str, DisplaySession] = {}
         self._known_screens: dict[str, QScreen] = {}
 
@@ -39,12 +40,14 @@ class MonitorManager(QObject):
         current_ids: set[str] = set()
         for screen in self._app.screens():
             descriptor = self._platform_adapter.describe_screen(screen)
-            current_ids.add(descriptor.monitor_uid)
-            self._known_screens[descriptor.monitor_uid] = screen
-            record = self._records_by_id.get(descriptor.monitor_uid)
+            current_ids.add(descriptor.screen_uid)
+            self._known_screens[descriptor.screen_uid] = screen
+            record = self._records_by_id.get(descriptor.screen_uid)
             if record is None:
-                record = MonitorRecord(
-                    monitor_id=descriptor.monitor_uid,
+                record = ScreenRecord(
+                    monitor_id=descriptor.screen_uid,
+                    screen_uid=descriptor.screen_uid,
+                    display_name=descriptor.display_name,
                     serial_number=descriptor.serial_number,
                     screen_name=descriptor.screen_name,
                     manufacturer=descriptor.manufacturer,
@@ -57,10 +60,13 @@ class MonitorManager(QObject):
                     physical_size_x=descriptor.physical_size_x,
                     physical_size_y=descriptor.physical_size_y,
                     refresh_rate=descriptor.refresh_rate,
+                    associated_monitors=descriptor.associated_monitors,
                     is_connected=True,
                 )
-                self._records_by_id[descriptor.monitor_uid] = record
+                self._records_by_id[descriptor.screen_uid] = record
             else:
+                record.screen_uid = descriptor.screen_uid
+                record.display_name = descriptor.display_name
                 record.serial_number = descriptor.serial_number
                 record.screen_name = descriptor.screen_name
                 record.manufacturer = descriptor.manufacturer
@@ -70,9 +76,10 @@ class MonitorManager(QObject):
                 record.height = descriptor.height
                 record.geometry_x = descriptor.geometry_x
                 record.geometry_y = descriptor.geometry_y
+                record.associated_monitors = descriptor.associated_monitors
                 record.is_connected = True
 
-            session = self._sessions_by_id.get(descriptor.monitor_uid)
+            session = self._sessions_by_id.get(descriptor.screen_uid)
             if session is not None:
                 session.attach_screen(screen)
 
@@ -113,6 +120,10 @@ class MonitorManager(QObject):
     def get_session(self, monitor_id: str) -> DisplaySession | None:
         return self._sessions_by_id.get(monitor_id)
 
+    def get_screen_record(self, monitor_id: str) -> ScreenRecord | None:
+        """Return the persistent record for a known screen."""
+        return self._records_by_id.get(monitor_id)
+
     def get_displayer(self, monitor_id: str) -> HologramManager | None:
         session = self.get_session(monitor_id)
         if session is None:
@@ -134,6 +145,12 @@ class MonitorManager(QObject):
                 session.attach_screen(screen)
         return session.displayer
 
+    def shutdown(self) -> None:
+        """Release all display sessions and their external control resources."""
+        for session in self._sessions_by_id.values():
+            session.close()
+        self._sessions_by_id.clear()
+
     def iter_debug_views(self) -> list[SessionDebugView]:
         views: list[SessionDebugView] = []
         for monitor_id in sorted(self._records_by_id):
@@ -148,6 +165,8 @@ class MonitorManager(QObject):
                         ready_for_frames=False,
                         has_screen_attached=False,
                         monitor_id=record.monitor_id,
+                        screen_uid=record.screen_uid,
+                        display_name=record.display_name,
                         serial_number=record.serial_number,
                         screen_name=record.screen_name,
                         manufacturer=record.manufacturer,
@@ -171,12 +190,12 @@ class MonitorManager(QObject):
 
     def _on_screen_added(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
-        self._known_screens[descriptor.monitor_uid] = screen
+        self._known_screens[descriptor.screen_uid] = screen
         self.rescan_screens()
 
     def _on_screen_removed(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
-        monitor_id = descriptor.monitor_uid
+        monitor_id = descriptor.screen_uid
         record = self._records_by_id.get(monitor_id)
         if record is not None:
             record.is_connected = False

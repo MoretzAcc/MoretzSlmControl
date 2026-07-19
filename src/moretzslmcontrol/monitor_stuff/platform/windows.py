@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QScreen
 
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
-from pyedid import Edid
 
+from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 from moretzslmcontrol.monitor_stuff.platform.windows_edid.windows_edid import windows_match_edids
 
 # imports here
@@ -22,8 +22,13 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class WindowsPlatformAdapter(PlatformAdapter):
-    def get_screen_edids(self, screen: QScreen) -> list[Edid]:
-        return [win_monitor.parsed_edid for win_monitor in windows_match_edids(screen)]
+    def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
+        return [
+            MonitorEdid(
+                os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid
+            )
+            for win_monitor in windows_match_edids(screen)
+        ]
 
     def detach_window_from_screen(self, window: QWidget) -> None:
         window.showMinimized()

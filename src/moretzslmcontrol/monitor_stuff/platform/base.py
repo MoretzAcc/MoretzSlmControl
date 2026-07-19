@@ -6,25 +6,31 @@ Generated using ChatGPT
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 # imports here
 
 from abc import ABC, abstractmethod
 
 from PySide6.QtCore import Qt
-
 from moretzslmcontrol.monitor_stuff.models import ScreenDescriptor
 from pyedid import Edid
+from hashlib import sha256
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
     from PySide6.QtWidgets import QWidget
 
 
-class PlatformAdapter(ABC):
+@dataclass(frozen=True)
+class MonitorEdid:
+    os_identifier: str
+    parsed_edid: Edid
 
+
+class PlatformAdapter(ABC):
     @abstractmethod
-    def get_screen_edids(self, screen: QScreen) -> list[Edid]:
+    def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
         pass
 
     def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
@@ -34,12 +40,21 @@ class PlatformAdapter(ABC):
         width = round(geometry.width() * dpr)
         height = round(geometry.height() * dpr)
         serial_number = screen.serialNumber().strip()
-        monitor_id = (
-            serial_number
-            or f"{screen.name()}_{width}x{height}_{screen.physicalSize().width()}mm_{screen.physicalSize().height()}mm"
+        display_name = "_".join(
+            f"{edid.parsed_edid.manufacturer_pnp_id} - {f'{edid.parsed_edid.name if edid.parsed_edid.name is not None else edid.parsed_edid.product_id}'.replace(' ', '_')}"
+            for edid in edids
         )
+        uid_source = "_".join(
+            (
+                display_name,
+                *(edid.os_identifier for edid in edids),
+                *(f"{edid.parsed_edid.year}/{edid.parsed_edid.week}" for edid in edids),
+            )
+        )
+        screen_uid = sha256(uid_source.encode("utf-8")).hexdigest()[:8]
         descriptor = ScreenDescriptor(
-            monitor_uid=monitor_id,
+            display_name=display_name,
+            screen_uid=screen_uid,
             serial_number=serial_number,
             screen_name=screen.name().strip(),
             manufacturer=screen.manufacturer().strip(),

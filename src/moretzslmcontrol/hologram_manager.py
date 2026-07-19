@@ -52,30 +52,58 @@ class HologramManager:
         self._includeHologramPattern: bool = True
         self._includeModificationPattern: bool = True
 
+        self._flipCorrectionPatternHorizontally: bool = False
+        self._flipHologramPatternHorizontally: bool = False
+        self._flipModificationPatternHorizontally: bool = False
+        self._flipCorrectionPatternVertically: bool = False
+        self._flipHologramPatternVertically: bool = False
+        self._flipModificationPatternVertically: bool = False
+
         self._latestFrame: NDArray[np.uint8] = np.zeros(self.shape, dtype=np.uint8)
         self._latestRevision: int = 0
         self._stats = SessionStats()
         self.heroConnector = SlmHeroConnector(self, self.herosName) # TODO make this toggleable somehow
 
 
-    def enableCorrectionPattern(self, value: bool = True) -> None:
+    def enableCorrectionPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:
             self._includeCorrectionPattern = value
-        self.publishCurrentPattern()
+        if update:
+            self.publishCurrentPattern()
 
-    def enableHologramPattern(self, value: bool = True) -> None:
+    def enableHologramPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:
             self._includeHologramPattern = value
-        self.publishCurrentPattern()
+        if update:
+            self.publishCurrentPattern()
 
-    def enableHologramPhasePattern(self, value: bool = True) -> None:
+    def enableHologramPhasePattern(self, value: bool = True, update: bool = True) -> None:
         """Backward-compatible alias for :meth:`enableHologramPattern`."""
-        self.enableHologramPattern(value)
+        self.enableHologramPattern(value, update)
 
-    def enableModificationPattern(self, value: bool = True) -> None:
+    def enableModificationPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:
             self._includeModificationPattern = value
-        self.publishCurrentPattern()
+        if update:
+            self.publishCurrentPattern()
+
+    def setFlipCorrectionPatternHorizontally(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("correction", "horizontal", value, update)
+
+    def setFlipCorrectionPatternVertically(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("correction", "vertical", value, update)
+
+    def setFlipHologramPatternHorizontally(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("hologram", "horizontal", value, update)
+
+    def setFlipHologramPatternVertically(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("hologram", "vertical", value, update)
+
+    def setFlipModificationPatternHorizontally(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("modification", "horizontal", value, update)
+
+    def setFlipModificationPatternVertically(self, value: bool, update: bool = True) -> None:
+        self._set_pattern_flip("modification", "vertical", value, update)
 
     def setCorrectionPattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
         if phaseArr is None:
@@ -83,7 +111,11 @@ class HologramManager:
         else:
             hologram = self._validate_and_resize(phaseArr, "correction pattern", warn_on_resize=True)
         with self._lock:
-            self._correctionPattern = wrap_phase(hologram)
+            self._correctionPattern = self._flip_imported_pattern(
+                wrap_phase(hologram),
+                self._flipCorrectionPatternHorizontally,
+                self._flipCorrectionPatternVertically,
+            )
         if update:
             self.publishCurrentPattern()
 
@@ -93,7 +125,11 @@ class HologramManager:
         else:
             hologram = self._validate_and_resize(phaseArr, "hologram pattern", warn_on_resize=True)
         with self._lock:
-            self._hologramPattern = wrap_phase(hologram)
+            self._hologramPattern = self._flip_imported_pattern(
+                wrap_phase(hologram),
+                self._flipHologramPatternHorizontally,
+                self._flipHologramPatternVertically,
+            )
         if update:
             self.publishCurrentPattern()
 
@@ -103,7 +139,11 @@ class HologramManager:
         else:
             hologram = self._validate_and_resize(phaseArr, "modification pattern", warn_on_resize=True)
         with self._lock:
-            self._modificationPattern = wrap_phase(hologram)
+            self._modificationPattern = self._flip_imported_pattern(
+                wrap_phase(hologram),
+                self._flipModificationPatternHorizontally,
+                self._flipModificationPatternVertically,
+            )
         if update:
             self.publishCurrentPattern()
 
@@ -119,8 +159,9 @@ class HologramManager:
                 self._totalPattern += self._modificationPattern
 
             self._totalPattern = wrap_phase(self._totalPattern)
+            total_pattern = self._totalPattern.copy()
 
-        img = np.ascontiguousarray(phaseToByte(self._totalPattern), dtype=np.uint8)
+        img = np.ascontiguousarray(phaseToByte(total_pattern), dtype=np.uint8)
 
         # img = np.flipud(img) # To flip the image vertically. Like this the 0,0 coordinate is at the bottom left. # TODO @Moretz think about this
 
@@ -155,6 +196,10 @@ class HologramManager:
         with self._lock:
             return replace(self._stats)
 
+    def close(self) -> None:
+        """Release external control resources owned by this display manager."""
+        self.heroConnector.close()
+
     def getPatternSnapshots(
         self,
     ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
@@ -166,6 +211,58 @@ class HologramManager:
                 self._modificationPattern.copy(),
                 self._totalPattern.copy(),
             )
+
+    def getPatternInclusion(self) -> tuple[bool, bool, bool]:
+        """Return whether correction, hologram, and modification patterns are included."""
+        with self._lock:
+            return (
+                self._includeCorrectionPattern,
+                self._includeHologramPattern,
+                self._includeModificationPattern,
+            )
+
+    def getPatternFlipStates(self) -> tuple[bool, bool, bool, bool, bool, bool]:
+        """Return horizontal and vertical flip states for all three component patterns."""
+        with self._lock:
+            return (
+                self._flipCorrectionPatternHorizontally,
+                self._flipCorrectionPatternVertically,
+                self._flipHologramPatternHorizontally,
+                self._flipHologramPatternVertically,
+                self._flipModificationPatternHorizontally,
+                self._flipModificationPatternVertically,
+            )
+
+    def _set_pattern_flip(
+        self,
+        component: str,
+        direction: str,
+        value: bool,
+        update: bool,
+    ) -> None:
+        flag_name = f"_flip{component.capitalize()}Pattern{direction.capitalize()}ly"
+        pattern_name = f"_{component}Pattern"
+        with self._lock:
+            if getattr(self, flag_name) == value:
+                return
+            pattern = getattr(self, pattern_name)
+            flipped_pattern = np.fliplr(pattern) if direction == "horizontal" else np.flipud(pattern)
+            setattr(self, pattern_name, np.ascontiguousarray(flipped_pattern, dtype=np.float32))
+            setattr(self, flag_name, value)
+        if update:
+            self.publishCurrentPattern()
+
+    @staticmethod
+    def _flip_imported_pattern(
+        pattern: NDArray[np.float32],
+        flip_horizontally: bool,
+        flip_vertically: bool,
+    ) -> NDArray[np.float32]:
+        if flip_horizontally:
+            pattern = np.fliplr(pattern)
+        if flip_vertically:
+            pattern = np.flipud(pattern)
+        return np.ascontiguousarray(pattern, dtype=np.float32)
 
     def _getBlankPattern(self) -> NDArray[np.float32]:
         return np.zeros(self.shape, dtype=np.float32)

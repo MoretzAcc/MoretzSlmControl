@@ -21,3 +21,9 @@ class SlmHeroConnector(LocalHERO):
         super().__init__(heros_name, *args, **kwargs)
         self.slm_connector = slm_connector
         logger.info(f"SLM is available as a Hero with name: {heros_name}")
+
+    def close(self) -> None:
+        """Release the HERO queryables and its Zenoh session reference."""
+        if getattr(self, "_hero_destroyed", False):
+            return
+        self._destroy_hero()

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 if TYPE_CHECKING:
-    from pyedid import Edid
+    from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 
 
 class SessionState(StrEnum):
@@ -34,8 +34,10 @@ class SessionState(StrEnum):
 
 
 @dataclass(slots=True)
-class MonitorRecord:
+class ScreenRecord: # A screen can be shown on multiple monitors!
     monitor_id: str
+    screen_uid: str
+    display_name: str
     serial_number: str
     screen_name: str
     manufacturer: str
@@ -48,6 +50,7 @@ class MonitorRecord:
     physical_size_x: float
     physical_size_y: float
     refresh_rate: float
+    associated_monitors: list[MonitorEdid]
     is_connected: bool = True
     was_ever_activated: bool = False
     last_error: str = ""
@@ -76,6 +79,8 @@ class SessionDebugView:
     ready_for_frames: bool
     has_screen_attached: bool
     monitor_id: str
+    screen_uid: str
+    display_name: str
     serial_number: str
     screen_name: str
     manufacturer: str
@@ -95,7 +100,8 @@ class SessionDebugView:
 
 @dataclass(slots=True)
 class ScreenDescriptor:
-    monitor_uid: str
+    display_name: str
+    screen_uid: str
     serial_number: str # Obsolete through edid
     screen_name: str # QScreen.name is connector name for linux, arbitrary for windows tho
     manufacturer: str # Obsolete through edid
@@ -108,7 +114,7 @@ class ScreenDescriptor:
     geometry_y: int
     physical_size_x: float
     physical_size_y: float
-    associated_monitors: list[Edid]
+    associated_monitors: list[MonitorEdid]
 
 """ copy here for reference
 

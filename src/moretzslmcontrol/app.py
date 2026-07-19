@@ -61,7 +61,11 @@ def run(argv: list[str] | None = None) -> int:
     monitor_manager = MonitorManager(app=app, platform_adapter=platform_adapter)
     main_window = MainWindow(monitor_manager=monitor_manager)
     main_window.show()
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        monitor_manager.shutdown()
+        zenoh.session_manager.force_close()
 
 def main() -> None:
     print("Hello from moretzslmcontrol!")

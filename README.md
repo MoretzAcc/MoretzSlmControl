@@ -30,6 +30,8 @@ Usage of AI
 
 Coordinate system... where is (0,0)? (Old comment: Flipped y Axis -> 0,0 is bottom left)
 
+Monitor UID, Herosname should be the same for a given combination of pc + monitor + used port
+
 # Known Bugs
 
 - Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).

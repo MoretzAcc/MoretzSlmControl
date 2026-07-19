@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QScreen
 
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
-from pyedid import Edid
 
+from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 from moretzslmcontrol.monitor_stuff.platform.linux_edid.get_all import get_linux_edids, LinuxMonitor
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class LinuxPlatformAdapter(PlatformAdapter):
         self.linux_monitors: list[LinuxMonitor] = []
         super().__init__()
 
-    def get_screen_edids(self, screen: QScreen) -> list[Edid]:
+    def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
         name = screen.name()
 
         monitor = next(
@@ -50,10 +50,11 @@ class LinuxPlatformAdapter(PlatformAdapter):
 
         if monitor is None:
             logger.error(f"Could not find EDID for connector {name}")
-            # TODO more checks ?
+            # TODO more checks ? No guarantee that this works on all linux distros. Tested for ubuntu:Gnome wayland and fedora KDE wayland
             return []
 
-        return [monitor.parsed_edid]
+        # TODO this currently only gets the main monitor for each screen
+        return [MonitorEdid(os_identifier=monitor.connector_name, parsed_edid=monitor.parsed_edid)]
 
     def refresh_edid_list(self) -> None:
         self.linux_monitors = get_linux_edids()
