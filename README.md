@@ -1,30 +1,51 @@
+# Moretz SLM Control
 
+Desktop application for controlling spatial light modulator (SLM) displays.
+
+> **AI notice:** This project was developed with AI assistance.
+
+Tested on:
+
+- Windows 11
+- Fedora 44 KDE Wayland
+- Ubuntu 24.04 GNOME Wayland
+
+## Requirements
+
+- Python 3.14 or newer
+- [uv](https://docs.astral.sh/uv/)
+
+## Install and run
 
 ```bash
+uv sync
 uv run moretzslmcontrol
 ```
 
+## Usage
 
-### TODO 
-- Connection via Heros toggleable
-- Connection via Rest Api toggleable
-- Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
-- Support SLM with different bit depth than 8
-- Aggressive Typing
+1. Select a detected screen from the sidebar.
+2. Enable its SLM window.
+3. Load correction and hologram patterns from `.npy` or `.bmp` files.
+4. Adjust the modification pattern and screen-specific settings as needed.
 
-### TODO in README
-Examples
+## HEROS integration
 
-Usage of AI
-- Big help of AI
+Each active SLM is exposed through [HEROS](https://pypi.org/project/heros/). This allows another process on the same computer, or a process on another device in the same network, to control the SLM without interacting with the GUI directly. Each screen has its own HERO name and console output.
 
-Coordinate system: (0,0) is in bottom left
+## Development
 
-Monitor UID, Herosname should be the same for a given combination of pc + monitor + used port
+```bash
+uv run ruff check .
+uv run mypy
+```
 
-# Known Bugs
+## Notes
 
-- Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).
-  → Aggressive scaling or fractional scaling can cause problems here.
+- The pattern coordinate origin is at the bottom left.
+- Strong or fractional operating-system display scaling can affect the detected SLM resolution.
 
-- Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
+## Known issues
+
+- Changing monitor settings while the application is running, such as display scaling, is not detected by Refresh.
+- EDID detection is unstable on Linux. It has been tested with KDE Wayland and Ubuntu GNOME Wayland.

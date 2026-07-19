@@ -1,10 +1,10 @@
 [project]
 name = "moretzslmcontrol"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.3.0"
+description = "Display grayscale hologram patterns for phase-only spatial light modulators."
 readme = "README.md"
 authors = [
-    { name = "Moretz (Fedora)", email = "moritzvaneimern@gmail.com" }
+    { name = "Moretz van Eimern", email = "moritzvaneimern@gmail.com" }
 ]
 requires-python = ">=3.14"
 dependencies = [
