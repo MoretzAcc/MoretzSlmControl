@@ -11,13 +11,13 @@ import logging
 from heros import LocalHERO
 
 if TYPE_CHECKING:
-    from moretzslmcontrol.external_control.slm_connector import SlmConnector
+    from moretzslmcontrol.hologram_manager import HologramManager
 
 logger = logging.getLogger(__name__)
 
 
 class SlmHeroConnector(LocalHERO):
-    def __init__(self, slm_connector: SlmConnector, heros_name: str, *args, **kwargs) -> None:
+    def __init__(self, slm_connector: HologramManager, heros_name: str, *args, **kwargs) -> None:
         super().__init__(heros_name, *args, **kwargs)
         self.slm_connector = slm_connector
         logger.info(f"SLM is available as a Hero with name: {heros_name}")

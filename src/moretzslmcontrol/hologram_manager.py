@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from moretzslmcontrol.external_control.slm_hero_connector import SlmHeroConnector
+from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
@@ -31,7 +31,11 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 logger = logging.getLogger(__name__)
 
 
-class SlmConnector:
+class PatternSizeMismatchError(Exception):
+    """Raised when a pattern cannot be resized to the SLM dimensions."""
+
+
+class HologramManager:
     def __init__(self, H: int, W: int, herosName: str, bridge: DisplayBridge) -> None:
         logger.info(f"Initializing SLM DisplayerV2 with resolution: {W}x{H}")
         self.herosName = herosName
@@ -39,12 +43,14 @@ class SlmConnector:
         self._bridge = bridge
         self._lock = threading.Lock()
 
-        self._baseHologram: NDArray[np.float64] = np.zeros(self.shape, dtype=np.float64)
-        self._slmCorrectionPattern: NDArray[np.float64] = np.zeros(self.shape, dtype=np.float64)
-        self._hologramPhasePattern: NDArray[np.float64] = np.zeros(self.shape, dtype=np.float64)
+        self._correctionPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
+        self._hologramPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
+        self._modificationPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
+        self._totalPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
 
         self._includeCorrectionPattern: bool = True
-        self._includeHologramPhasePattern: bool = True
+        self._includeHologramPattern: bool = True
+        self._includeModificationPattern: bool = True
 
         self._latestFrame: NDArray[np.uint8] = np.zeros(self.shape, dtype=np.uint8)
         self._latestRevision: int = 0
@@ -55,85 +61,68 @@ class SlmConnector:
     def enableCorrectionPattern(self, value: bool = True) -> None:
         with self._lock:
             self._includeCorrectionPattern = value
+        self.publishCurrentPattern()
+
+    def enableHologramPattern(self, value: bool = True) -> None:
+        with self._lock:
+            self._includeHologramPattern = value
+        self.publishCurrentPattern()
 
     def enableHologramPhasePattern(self, value: bool = True) -> None:
-        with self._lock:
-            self._includeHologramPhasePattern = value
+        """Backward-compatible alias for :meth:`enableHologramPattern`."""
+        self.enableHologramPattern(value)
 
-    def setBaseHologram(self, phaseArr: NDArray[Any] | None, update: bool = True) -> bool:
-        if phaseArr is None:
-            hologram = self._getBlankPattern()
-        else:
-            hologram = self._validate_and_resize(phaseArr, "base hologram")
-            if hologram is None:
-                return False
+    def enableModificationPattern(self, value: bool = True) -> None:
         with self._lock:
-            self._baseHologram = hologram
-        if update:
-            self.publishCurrentPattern()
-        return True
+            self._includeModificationPattern = value
+        self.publishCurrentPattern()
 
-    def setHologramPhase(self, phaseArr: NDArray[Any] | None, update: bool = True) -> bool:
-        if phaseArr is None:
-            hologram = self._getBlankPattern()
-        else:
-            hologram = self._validate_and_resize(phaseArr, "phaseArr", warn_on_resize=True)
-            if hologram is None:
-                return False
-        with self._lock:
-            self._hologramPhasePattern = hologram
-        if update:
-            self.publishCurrentPattern()
-        return True
-
-    def setCorrectionPattern(self, phaseArr: NDArray[Any] | None, update: bool = True) -> bool:
+    def setCorrectionPattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
         if phaseArr is None:
             hologram = self._getBlankPattern()
         else:
             hologram = self._validate_and_resize(phaseArr, "correction pattern", warn_on_resize=True)
-            if hologram is None:
-                return False
         with self._lock:
-            self._slmCorrectionPattern = wrap_phase(hologram)
+            self._correctionPattern = wrap_phase(hologram)
         if update:
             self.publishCurrentPattern()
-        return True
 
-    def setRawFrame(self, bmpArr: NDArray[Any], notify: bool = True) -> bool:
+    def setHologramPattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
+        if phaseArr is None:
+            hologram = self._getBlankPattern()
+        else:
+            hologram = self._validate_and_resize(phaseArr, "hologram pattern", warn_on_resize=True)
         with self._lock:
-            self._stats.submitted_count += 1
-        if not isinstance(bmpArr, np.ndarray) or bmpArr.ndim != 2:
-            self._mark_invalid("raw frame must be a 2D numpy array")
-            return False
-        resized = pixelResizeArray(bmpArr, self.shape)
-        if resized is None:
-            self._mark_invalid("could not resize raw frame to SLM resolution")
-            return False
-        img = np.asarray(resized, dtype=np.uint8)
+            self._hologramPattern = wrap_phase(hologram)
+        if update:
+            self.publishCurrentPattern()
+
+    def setModificationPattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
+        if phaseArr is None:
+            hologram = self._getBlankPattern()
+        else:
+            hologram = self._validate_and_resize(phaseArr, "modification pattern", warn_on_resize=True)
         with self._lock:
-            self._latestFrame = np.ascontiguousarray(img)
-            self._latestRevision += 1
-            self._stats.accepted_count += 1
-            self._stats.latest_revision = self._latestRevision
-            revision = self._latestRevision
-        self._bridge.notify_stats_changed()
-        if notify:
-            self._bridge.notify_new_frame(revision)
-        return True
+            self._modificationPattern = wrap_phase(hologram)
+        if update:
+            self.publishCurrentPattern()
 
     def publishCurrentPattern(self) -> bool:
-        with self._lock:
+        with (self._lock):
             self._stats.submitted_count += 1
-            totalPhase = self._baseHologram.copy()
+            self._totalPattern = np.zeros_like(self._totalPattern, dtype=np.float32)
             if self._includeCorrectionPattern:
-                totalPhase += self._slmCorrectionPattern
-            if self._includeHologramPhasePattern:
-                totalPhase += self._hologramPhasePattern
+                self._totalPattern += self._correctionPattern
+            if self._includeHologramPattern:
+                self._totalPattern += self._hologramPattern
+            if self._includeModificationPattern:
+                self._totalPattern += self._modificationPattern
 
-        totalPhase = wrap_phase(totalPhase)
-        img = np.ascontiguousarray(phaseToByte(totalPhase), dtype=np.uint8)
+            self._totalPattern = wrap_phase(self._totalPattern)
 
-        img = np.flipud(img) # To flip the image vertically. Like this the 0,0 coordinate is at the bottom left.
+        img = np.ascontiguousarray(phaseToByte(self._totalPattern), dtype=np.uint8)
+
+        # img = np.flipud(img) # To flip the image vertically. Like this the 0,0 coordinate is at the bottom left. # TODO @Moretz think about this
 
         with self._lock:
             self._latestFrame = img
@@ -166,18 +155,31 @@ class SlmConnector:
         with self._lock:
             return replace(self._stats)
 
-    def _getBlankPattern(self) -> NDArray[np.float64]:
-        return np.zeros(self.shape, dtype=np.float64)
+    def getPatternSnapshots(
+        self,
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
+        """Return safe copies of the correction, hologram, modification, and total patterns."""
+        with self._lock:
+            return (
+                self._correctionPattern.copy(),
+                self._hologramPattern.copy(),
+                self._modificationPattern.copy(),
+                self._totalPattern.copy(),
+            )
+
+    def _getBlankPattern(self) -> NDArray[np.float32]:
+        return np.zeros(self.shape, dtype=np.float32)
 
     def _validate_and_resize(
         self,
         arr: NDArray[Any],
         arg_name: str,
         warn_on_resize: bool = False,
-    ) -> NDArray[np.float64] | None:
+    ) -> NDArray[np.float32]:
         if not isinstance(arr, np.ndarray) or arr.ndim != 2:
-            self._mark_invalid(f"{arg_name} must be a 2D numpy array")
-            return None
+            message = f"{arg_name} must be a 2D numpy array"
+            self._mark_invalid(message)
+            raise ValueError(message)
 
         with self._lock:
             self._stats.submitted_count += 1
@@ -190,9 +192,10 @@ class SlmConnector:
 
         resized = pixelResizeArray(arr, self.shape)
         if resized is None:
-            self._mark_invalid(f"could not resize {arg_name} to SLM resolution")
-            return None
-        return np.asarray(resized, dtype=np.float64)
+            message = f"{arg_name} shape {arr.shape} cannot be resized to SLM size {self.shape}"
+            self._mark_invalid(message)
+            raise PatternSizeMismatchError(message)
+        return np.asarray(resized, dtype=np.float32)
 
     def _mark_invalid(self, reason: str) -> None:
         logger.warning(f"DisplayerV2 rejected frame update: {reason}")

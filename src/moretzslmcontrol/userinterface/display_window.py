@@ -15,13 +15,13 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
-    from moretzslmcontrol.external_control.slm_connector import SlmConnector
+    from moretzslmcontrol.hologram_manager import HologramManager
     from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
 
 
 
 class DisplayWindow(QWidget):
-    def __init__(self, session_id: str, displayer: SlmConnector, platform_adapter: PlatformAdapter) -> None:
+    def __init__(self, session_id: str, displayer: HologramManager, platform_adapter: PlatformAdapter) -> None:
         super().__init__(None)
         self._session_id = session_id
         self._displayer = displayer

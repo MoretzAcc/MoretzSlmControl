@@ -7,7 +7,7 @@ Generated using ChatGPT
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from moretzslmcontrol.external_control.slm_connector import SlmConnector
+from moretzslmcontrol.hologram_manager import HologramManager
 from moretzslmcontrol.userinterface.display_bridge import DisplayBridge
 from moretzslmcontrol.userinterface.display_window import DisplayWindow
 from moretzslmcontrol.monitor_stuff.models import SessionState, SessionDebugView
@@ -26,7 +26,7 @@ class DisplaySession:
         self.heros_name = f"slmHero_{monitor_record.monitor_id.replace(' ', '_')}"
         self.platform_adapter = platform_adapter
         self.bridge = DisplayBridge(session_id=self.session_id)
-        self.displayer = SlmConnector(
+        self.displayer = HologramManager(
             H=monitor_record.height,
             W=monitor_record.width,
             herosName=self.heros_name,

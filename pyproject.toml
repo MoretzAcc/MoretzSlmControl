@@ -58,4 +58,8 @@ ignore = [
     "ANN003", # **kwargs
 ]
 
-exclude = ["*.ipynb"]
+exclude = [
+    "*.ipynb",
+    "src/moretzslmcontrol/monitor_stuff/platform/linux_edid/**",
+    "src/moretzslmcontrol/monitor_stuff/platform/windows_edid/**",
+]

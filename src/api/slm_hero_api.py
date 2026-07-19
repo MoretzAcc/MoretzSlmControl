@@ -14,8 +14,8 @@ from heros import RemoteHERO
 
 
 if TYPE_CHECKING:
-    from moretzslmcontrol.external_control.slm_connector import SlmConnector
-    from moretzslmcontrol.external_control.slm_hero_connector import SlmHeroConnector
+    from moretzslmcontrol.hologram_manager import HologramManager
+    from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class SlmHeroNotFoundError(NameError):
 
 
 @contextmanager
-def SlmHeroApi(hero_name: str) -> Iterator[SlmConnector]:
+def SlmHeroApi(hero_name: str) -> Iterator[HologramManager]:
     try:
         with RemoteHERO(hero_name) as hero:
             # noinspection PyUnnecessaryCast

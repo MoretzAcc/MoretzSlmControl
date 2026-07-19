@@ -21,7 +21,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtWidgets import QWidget
 
 
-class PlatformAdapter(ABC):  # noqa: B024
+class PlatformAdapter(ABC):
 
     @abstractmethod
     def get_screen_edids(self, screen: QScreen) -> list[Edid]:

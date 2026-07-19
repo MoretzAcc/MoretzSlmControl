@@ -17,7 +17,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from PySide6.QtGui import QScreen
     from PySide6.QtWidgets import QApplication
     from moretzslmcontrol.monitor_stuff.platform.base import PlatformAdapter
-    from moretzslmcontrol.external_control.slm_connector import SlmConnector
+    from moretzslmcontrol.hologram_manager import HologramManager
 
 
 class MonitorManager(QObject):
@@ -113,10 +113,25 @@ class MonitorManager(QObject):
     def get_session(self, monitor_id: str) -> DisplaySession | None:
         return self._sessions_by_id.get(monitor_id)
 
-    def get_displayer(self, monitor_id: str) -> SlmConnector | None:
+    def get_displayer(self, monitor_id: str) -> HologramManager | None:
         session = self.get_session(monitor_id)
         if session is None:
             return None
+        return session.displayer
+
+    def ensure_displayer(self, monitor_id: str) -> HologramManager | None:
+        """Return a display manager, creating an inactive session when required."""
+        record = self._records_by_id.get(monitor_id)
+        if record is None:
+            return None
+        session = self._sessions_by_id.get(monitor_id)
+        if session is None:
+            session = DisplaySession(record, self._platform_adapter)
+            session.bridge.statsChanged.connect(lambda _session_id: self.recordsChanged.emit())
+            self._sessions_by_id[monitor_id] = session
+            screen = self._known_screens.get(monitor_id)
+            if record.is_connected and screen is not None:
+                session.attach_screen(screen)
         return session.displayer
 
     def iter_debug_views(self) -> list[SessionDebugView]:
