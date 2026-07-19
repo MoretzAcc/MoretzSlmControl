@@ -17,6 +17,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class DisplayBridge(QObject):
     frameAvailable = Signal(str, int)
     statsChanged = Signal(str)
+    consoleMessage = Signal(str, str, str)
 
     def __init__(self, session_id: str, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -31,3 +32,6 @@ class DisplayBridge(QObject):
 
     def notify_stats_changed(self) -> None:
         self.statsChanged.emit(self._session_id)
+
+    def notify_console(self, level: str, message: str) -> None:
+        self.consoleMessage.emit(self._session_id, level, message)

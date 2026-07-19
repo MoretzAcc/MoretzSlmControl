@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -67,7 +67,9 @@ class MainWindow(QMainWindow):
         self._last_modification_parameters: dict[str, tuple[float, ...]] = {}
         self._pattern_active_checks: dict[str, QCheckBox] = {}
         self._pattern_flip_checks: dict[tuple[str, str], QCheckBox] = {}
+        self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
+        self._monitor_manager.consoleChanged.connect(self._on_console_changed)
 
         self.setWindowTitle("SLM Display Control")
         self.resize(1550, 880)
@@ -233,25 +235,25 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(
             self._build_pattern_component(
-                "Base aberration", component_key="base", has_file_selector=True
+                "Correction Pattern", component_key="base", has_file_selector=True
             ),
             1,
         )
         layout.addWidget(self._build_operator_label("+"))
         layout.addWidget(
-            self._build_pattern_component("Hologram", component_key="hologram", has_file_selector=True),
+            self._build_pattern_component("Hologram Pattern", component_key="hologram", has_file_selector=True),
             1,
         )
         layout.addWidget(self._build_operator_label("+"))
         layout.addWidget(
             self._build_pattern_component(
-                "Modification", component_key="modification", has_shift_controls=True
+                "Modification Pattern", component_key="modification", has_shift_controls=True
             ),
             1,
         )
         layout.addWidget(self._build_operator_label("="))
         layout.addWidget(
-            self._build_pattern_component("Total hologram", component_key="total"),
+            self._build_pattern_component("Applied Hologram", component_key="total"),
             1,
         )
         return group
@@ -376,9 +378,6 @@ class MainWindow(QMainWindow):
         path_field = self._pattern_path_fields[component_key]
         path_field.setText(Path(file_path).name)
         path_field.setToolTip(file_path)
-        self._write_console(
-            f"Imported {component_name} from {Path(file_path).name} ({pattern.shape[1]}x{pattern.shape[0]})"
-        )
         self._upload_pattern(component_key, component_name, pattern, monitor_id)
 
     def _upload_pattern(
@@ -392,25 +391,18 @@ class MainWindow(QMainWindow):
         if displayer is None:
             self._write_console(f"Error applying {component_name}: screen is no longer available")
             return
-        if pattern.shape != displayer.shape:
-            self._write_console(
-                f"Warning: {component_name} size {pattern.shape} differs from SLM size "
-                f"{displayer.shape}; attempting automatic resize."
-            )
 
         try:
             if component_key == "base":
                 displayer.setCorrectionPattern(pattern)
             else:
                 displayer.setHologramPattern(pattern)
-        except PatternSizeMismatchError as error:
-            self._write_console(f"Error applying {component_name}: {error}")
+        except PatternSizeMismatchError:
             return
         except Exception as error:
             self._write_console(f"Error applying {component_name}: {error}")
             return
 
-        self._write_console(f"Applied {component_name} to the SLM session.")
         self.updatePreview()
 
     def _set_pattern_active(self, component_key: str, is_active: bool) -> None:
@@ -424,18 +416,13 @@ class MainWindow(QMainWindow):
 
         if component_key == "base":
             displayer.enableCorrectionPattern(is_active, update=False)
-            component_name = "base aberration"
         elif component_key == "hologram":
             displayer.enableHologramPattern(is_active, update=False)
-            component_name = "hologram"
         elif component_key == "modification":
             displayer.enableModificationPattern(is_active, update=False)
-            component_name = "modification"
         else:
             raise ValueError(f"Unknown pattern component: {component_key}")
 
-        state = "enabled" if is_active else "disabled"
-        self._write_console(f"{component_name.capitalize()} pattern {state}.")
         self.updatePreview()
         Thread(target=displayer.publishCurrentPattern, daemon=True).start()
 
@@ -454,20 +441,16 @@ class MainWindow(QMainWindow):
                 if direction == "horizontal"
                 else displayer.setFlipCorrectionPatternVertically
             )
-            component_name = "base aberration"
         elif component_key == "hologram":
             setter = (
                 displayer.setFlipHologramPatternHorizontally
                 if direction == "horizontal"
                 else displayer.setFlipHologramPatternVertically
             )
-            component_name = "hologram"
         else:
             raise ValueError(f"Unsupported flip component: {component_key}")
 
         setter(is_flipped, update=False)
-        state = "enabled" if is_flipped else "disabled"
-        self._write_console(f"{direction.capitalize()} flip for {component_name} {state}.")
         Thread(target=displayer.publishCurrentPattern, daemon=True).start()
 
     def updatePreview(self) -> None:
@@ -526,12 +509,36 @@ class MainWindow(QMainWindow):
         preview.setPixmap(QPixmap.fromImage(image))
 
     def _write_console(self, message: str) -> None:
-        if message.startswith("Error"):
-            color = "#d32f2f"
-        elif message.startswith("Warning"):
-            color = "#ef6c00"
-        else:
-            color = "#2e7d32"
+        screen_uid = self._selected_monitor_id()
+        if screen_uid is None:
+            logger.error(message)
+            return
+        level, clean_message = self._console_level_and_message(message)
+        self._monitor_manager.write_to_console(screen_uid, clean_message, level)
+
+    @staticmethod
+    def _console_level_and_message(message: str) -> tuple[str, str]:
+        for prefix, level in (("Error:", "error"), ("Warning:", "warning")):
+            if message.startswith(prefix):
+                return level, message.removeprefix(prefix).strip()
+        return "info", message
+
+    @Slot(str)
+    def _on_console_changed(self, screen_uid: str) -> None:
+        if screen_uid != self._selected_monitor_id():
+            return
+        self._show_console_for_screen(screen_uid, force=True)
+
+    def _show_console_for_screen(self, screen_uid: str, *, force: bool = False) -> None:
+        if not force and self._console_screen_uid == screen_uid:
+            return
+        self._console.clear()
+        for level, message in self._monitor_manager.get_console_entries(screen_uid):
+            self._append_console_entry(level, message)
+        self._console_screen_uid = screen_uid
+
+    def _append_console_entry(self, level: str, message: str) -> None:
+        color = {"error": "#d32f2f", "warning": "#ef6c00", "info": "#2e7d32"}.get(level, "#2e7d32")
         self._console.append(f'<span style="color: {color};">{escape(message)}</span>')
 
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
@@ -709,8 +716,7 @@ class MainWindow(QMainWindow):
                 dy=pixel_pitch * 1e-6,
             )
             displayer.setModificationPattern(pattern)
-        except PatternSizeMismatchError as error:
-            self._write_console(f"Error: could not apply modification pattern: {error}")
+        except PatternSizeMismatchError:
             return
         except Exception as error:
             self._write_console(f"Error: could not generate modification pattern: {error}")
@@ -734,7 +740,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(group)
         self._console = QTextEdit()
         self._console.setReadOnly(True)
-        self._console.setPlaceholderText("Status messages will appear here.")
+        self._console.setPlaceholderText("Nothing to show yet.")
         self._console.setFixedHeight(78)
         layout.addWidget(self._console)
         return group
@@ -786,6 +792,7 @@ class MainWindow(QMainWindow):
             self._screen_info_fields[key].setText(value)
         self._sync_pattern_active_checks(monitor_id)
         self._sync_pattern_flip_checks(monitor_id)
+        self._show_console_for_screen(monitor_id)
         self.updatePreview()
 
     def _sync_pattern_active_checks(self, monitor_id: str) -> None:

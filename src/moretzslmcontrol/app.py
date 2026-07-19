@@ -50,7 +50,7 @@ from moretzslmcontrol.monitor_stuff.platform import create_platform_adapter
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     ...
 
-SetColorfulLogging(showLevel=logging.DEBUG, deleteOtherHandlers=True)
+SetColorfulLogging(showLevel=logging.INFO, deleteOtherHandlers=True)
 
 
 def run(argv: list[str] | None = None) -> int:

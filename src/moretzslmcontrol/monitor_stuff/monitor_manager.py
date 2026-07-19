@@ -6,12 +6,16 @@ Generated using ChatGPT
 
 from __future__ import annotations
 
+import logging
+from collections import deque
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Slot
 
 from moretzslmcontrol.userinterface.display_session import DisplaySession
 from moretzslmcontrol.monitor_stuff.models import ScreenRecord, SessionDebugView, SessionState
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
@@ -23,6 +27,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 class MonitorManager(QObject):
     recordsChanged = Signal()
+    consoleChanged = Signal(str)
 
     def __init__(self, app: QApplication, platform_adapter: PlatformAdapter) -> None:
         super().__init__()
@@ -31,6 +36,7 @@ class MonitorManager(QObject):
         self._records_by_id: dict[str, ScreenRecord] = {}
         self._sessions_by_id: dict[str, DisplaySession] = {}
         self._known_screens: dict[str, QScreen] = {}
+        self._console_entries_by_id: dict[str, deque[tuple[str, str]]] = {}
 
         self._app.screenAdded.connect(self._on_screen_added)
         self._app.screenRemoved.connect(self._on_screen_removed)
@@ -100,7 +106,8 @@ class MonitorManager(QObject):
         session = self._sessions_by_id.get(monitor_id)
         if session is None:
             session = DisplaySession(record, self._platform_adapter)
-            session.bridge.statsChanged.connect(lambda _session_id: self.recordsChanged.emit())
+            session.bridge.statsChanged.connect(self._on_session_stats_changed)
+            session.bridge.consoleMessage.connect(self._on_session_console_message)
             self._sessions_by_id[monitor_id] = session
             if record.is_connected:
                 screen = self._known_screens.get(monitor_id)
@@ -138,7 +145,8 @@ class MonitorManager(QObject):
         session = self._sessions_by_id.get(monitor_id)
         if session is None:
             session = DisplaySession(record, self._platform_adapter)
-            session.bridge.statsChanged.connect(lambda _session_id: self.recordsChanged.emit())
+            session.bridge.statsChanged.connect(self._on_session_stats_changed)
+            session.bridge.consoleMessage.connect(self._on_session_console_message)
             self._sessions_by_id[monitor_id] = session
             screen = self._known_screens.get(monitor_id)
             if record.is_connected and screen is not None:
@@ -150,6 +158,37 @@ class MonitorManager(QObject):
         for session in self._sessions_by_id.values():
             session.close()
         self._sessions_by_id.clear()
+
+    def write_to_console(self, screen_uid: str, message: str, level: str = "info") -> None:
+        """Store a screen-scoped console entry and mirror it to the application logger."""
+        log_method = {
+            "info": logger.info,
+            "warning": logger.warning,
+            "error": logger.error,
+        }.get(level)
+        if log_method is None:
+            raise ValueError(f"Unsupported console level: {level}")
+        record = self._records_by_id.get(screen_uid)
+        display_name = record.display_name if record is not None else screen_uid
+        log_method("[%s] %s", display_name, message)
+        entries = self._console_entries_by_id.setdefault(screen_uid, deque(maxlen=500))
+        entries.append((level, message))
+        self.consoleChanged.emit(screen_uid)
+
+    def get_console_entries(self, screen_uid: str) -> tuple[tuple[str, str], ...]:
+        """Return the retained console entries for one screen in chronological order."""
+        return tuple(self._console_entries_by_id.get(screen_uid, ()))
+
+    @Slot(str)
+    def _on_session_stats_changed(self, _session_id: str) -> None:
+        self.recordsChanged.emit()
+
+    @Slot(str, str, str)
+    def _on_session_console_message(self, session_id: str, level: str, message: str) -> None:
+        record = self._records_by_id.get(session_id)
+        if record is not None and level == "error":
+            record.last_error = message
+        self.write_to_console(session_id, message, level)
 
     def iter_debug_views(self) -> list[SessionDebugView]:
         views: list[SessionDebugView] = []
@@ -204,3 +243,4 @@ class MonitorManager(QObject):
         if session is not None:
             session.detach_screen()
         self.recordsChanged.emit()
+logger = logging.getLogger(__name__)

@@ -77,10 +77,6 @@ class HologramManager:
         if update:
             self.publishCurrentPattern()
 
-    def enableHologramPhasePattern(self, value: bool = True, update: bool = True) -> None:
-        """Backward-compatible alias for :meth:`enableHologramPattern`."""
-        self.enableHologramPattern(value, update)
-
     def enableModificationPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:
             self._includeModificationPattern = value
@@ -163,8 +159,6 @@ class HologramManager:
 
         img = np.ascontiguousarray(phaseToByte(total_pattern), dtype=np.uint8)
 
-        # img = np.flipud(img) # To flip the image vertically. Like this the 0,0 coordinate is at the bottom left. # TODO @Moretz think about this
-
         with self._lock:
             self._latestFrame = img
             self._latestRevision += 1
@@ -194,11 +188,15 @@ class HologramManager:
 
     def getStatsSnapshot(self) -> SessionStats:
         with self._lock:
-            return replace(self._stats)
+            return replace(self._stats) # essentially a copy
 
     def close(self) -> None:
         """Release external control resources owned by this display manager."""
         self.heroConnector.close()
+
+    def write_to_console(self, message: str, level: str = "info") -> None:
+        """Forward a screen-scoped message to the shared console and application logger."""
+        self._bridge.notify_console(level, message)
 
     def getPatternSnapshots(
         self,
@@ -260,7 +258,7 @@ class HologramManager:
     ) -> NDArray[np.float32]:
         if flip_horizontally:
             pattern = np.fliplr(pattern)
-        if flip_vertically:
+        if not flip_vertically: # Deliberate extra flip to make sure the 0,0 coordinate is at the bottom left by default.
             pattern = np.flipud(pattern)
         return np.ascontiguousarray(pattern, dtype=np.float32)
 
@@ -282,10 +280,7 @@ class HologramManager:
             self._stats.submitted_count += 1
 
         if arr.shape != self.shape and warn_on_resize:
-            warnings.warn(
-                f"{arg_name} shape {arr.shape} is different than SLM size {self.shape}. Trying to resize to SLM resolution.",
-                RuntimeWarning, stacklevel=2,
-            )
+            self._bridge.notify_console("warning", f"{arg_name} shape {arr.shape} is different than SLM size {self.shape}. Trying to resize to SLM resolution.")
 
         resized = pixelResizeArray(arr, self.shape)
         if resized is None:
@@ -295,7 +290,7 @@ class HologramManager:
         return np.asarray(resized, dtype=np.float32)
 
     def _mark_invalid(self, reason: str) -> None:
-        logger.warning(f"DisplayerV2 rejected frame update: {reason}")
         with self._lock:
             self._stats.invalid_count += 1
         self._bridge.notify_stats_changed()
+        self._bridge.notify_console("error", reason)
