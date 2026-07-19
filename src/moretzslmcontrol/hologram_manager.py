@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 
 import threading
-import warnings
 from dataclasses import replace
 from typing import Any
 

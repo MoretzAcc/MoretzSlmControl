@@ -32,11 +32,7 @@ def makeSlmPhaseForSingleFocalSpot(
     dy: float,
 ) -> NDArray[np.float32]:
     """
-    Returns the phase pattern of a single spot based on the unpadded meshgrid.
-
-    Can work up to a couple spots.
-
-    Formula from Sylvain's Talk
+    Returns the pattern to shift the intensity in the image plane.
     """
     x = np.float32(x)
     y = np.float32(y)
@@ -66,10 +62,10 @@ def getMeshGrid(
     Ny: int,
     dx: float,
     dy: float,
-) -> tuple[NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
 
-    Nx: np.int32 = np.int32(Nx)
-    Ny: np.int32 = np.int32(Ny)
+    Nx = np.int32(Nx)
+    Ny = np.int32(Ny)
     horizontalRange = np.arange(Nx, dtype=np.float32) - Nx // 2
     verticalRange = np.arange(Ny, dtype=np.float32) - Ny // 2
 

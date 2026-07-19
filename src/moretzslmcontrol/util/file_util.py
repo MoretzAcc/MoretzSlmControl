@@ -48,6 +48,7 @@ def importBmpHologram(path: Path | str) -> NDArray[np.float32]:
     with Image.open(path) as image:
         if image.format != "BMP":
             raise ValueError("File does not contain a valid BMP image")
-        array = np.array(image.convert("L"), dtype=np.uint8)
-
+        array = np.array(image.convert("L"))
+    if array.dtype != np.uint8:
+        raise ValueError(f"As of now, only uint8 BMPs are supported, got {array.dtype} instead")
     return byteToPhase(array)
