@@ -109,14 +109,14 @@ class MainWindow(QMainWindow):
         self.refresh_views()
 
     def refresh_views(self) -> None:
-        selected_monitor_id = self._selected_monitor_id()
+        selected_screen_uid = self._selected_screen_uid()
         self._list_widget.clear()
         for view in self._monitor_manager.iter_debug_views():
             item = QListWidgetItem(self._build_item_label(view))
-            item.setData(Qt.ItemDataRole.UserRole, view.monitor_id)
+            item.setData(Qt.ItemDataRole.UserRole, view.screen_uid)
             item.setToolTip(self._build_item_tooltip(view))
             self._list_widget.addItem(item)
-            if view.monitor_id == selected_monitor_id:
+            if view.screen_uid == selected_screen_uid:
                 self._list_widget.setCurrentItem(item)
         if self._list_widget.currentItem() is None and self._list_widget.count() > 0:
             self._list_widget.setCurrentRow(0)
@@ -369,25 +369,25 @@ class MainWindow(QMainWindow):
             self._write_console(f"Error importing {component_name}: {error}")
             return
 
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             self._write_console(f"Error importing {component_name}: no screen is selected")
             return
-        self._loaded_patterns.setdefault(monitor_id, {})[component_key] = pattern
-        self._loaded_pattern_paths.setdefault(monitor_id, {})[component_key] = file_path
+        self._loaded_patterns.setdefault(screen_uid, {})[component_key] = pattern
+        self._loaded_pattern_paths.setdefault(screen_uid, {})[component_key] = file_path
         path_field = self._pattern_path_fields[component_key]
         path_field.setText(Path(file_path).name)
         path_field.setToolTip(file_path)
-        self._upload_pattern(component_key, component_name, pattern, monitor_id)
+        self._upload_pattern(component_key, component_name, pattern, screen_uid)
 
     def _upload_pattern(
         self,
         component_key: str,
         component_name: str,
         pattern: NDArray[np.float32],
-        monitor_id: str,
+        screen_uid: str,
     ) -> None:
-        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
         if displayer is None:
             self._write_console(f"Error applying {component_name}: screen is no longer available")
             return
@@ -406,10 +406,10 @@ class MainWindow(QMainWindow):
         self.updatePreview()
 
     def _set_pattern_active(self, component_key: str, is_active: bool) -> None:
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             return
-        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
         if displayer is None:
             self._write_console("Error: selected screen is no longer available")
             return
@@ -427,10 +427,10 @@ class MainWindow(QMainWindow):
         Thread(target=displayer.publishCurrentPattern, daemon=True).start()
 
     def _set_pattern_flip(self, component_key: str, direction: str, is_flipped: bool) -> None:
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             return
-        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
         if displayer is None:
             self._write_console("Error: selected screen is no longer available")
             return
@@ -455,8 +455,8 @@ class MainWindow(QMainWindow):
 
     def updatePreview(self) -> None:
         """Update the bounded grayscale previews for the selected screen's patterns."""
-        monitor_id = self._selected_monitor_id()
-        displayer = self._monitor_manager.get_displayer(monitor_id) if monitor_id else None
+        screen_uid = self._selected_screen_uid()
+        displayer = self._monitor_manager.get_displayer(screen_uid) if screen_uid else None
         if displayer is None:
             for preview in self._preview_labels.values():
                 preview.clear()
@@ -509,7 +509,7 @@ class MainWindow(QMainWindow):
         preview.setPixmap(QPixmap.fromImage(image))
 
     def _write_console(self, message: str) -> None:
-        screen_uid = self._selected_monitor_id()
+        screen_uid = self._selected_screen_uid()
         if screen_uid is None:
             logger.error(message)
             return
@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _on_console_changed(self, screen_uid: str) -> None:
-        if screen_uid != self._selected_monitor_id():
+        if screen_uid != self._selected_screen_uid():
             return
         self._show_console_for_screen(screen_uid, force=True)
 
@@ -677,8 +677,8 @@ class MainWindow(QMainWindow):
         self._update_modification_pattern()
 
     def _update_modification_pattern(self) -> None:
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             return
 
         try:
@@ -694,10 +694,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = (x, y, z, wavelength, focal_length, magnification, pixel_pitch)
-        if self._last_modification_parameters.get(monitor_id) == parameters:
+        if self._last_modification_parameters.get(screen_uid) == parameters:
             return
 
-        displayer = self._monitor_manager.ensure_displayer(monitor_id)
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
         if displayer is None:
             self._write_console("Error: selected screen is no longer available")
             return
@@ -722,7 +722,7 @@ class MainWindow(QMainWindow):
             self._write_console(f"Error: could not generate modification pattern: {error}")
             return
 
-        self._last_modification_parameters[monitor_id] = parameters
+        self._last_modification_parameters[screen_uid] = parameters
         self.updatePreview()
 
     def _read_positive_modification_parameter(self, key: str) -> float:
@@ -752,13 +752,13 @@ class MainWindow(QMainWindow):
         return label
 
     def _update_selected_screen(self, *_: object) -> None:
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             self._content_stack.setCurrentWidget(self._empty_page)
             return
 
-        views = {view.monitor_id: view for view in self._monitor_manager.iter_debug_views()}
-        view = views.get(monitor_id)
+        views = {view.screen_uid: view for view in self._monitor_manager.iter_debug_views()}
+        view = views.get(screen_uid)
         if view is None:
             self._content_stack.setCurrentWidget(self._empty_page)
             return
@@ -766,7 +766,7 @@ class MainWindow(QMainWindow):
         self._content_stack.setCurrentWidget(self._details_page)
         self._screen_title.setText(view.display_name or "Unnamed screen")
         self._update_slm_window_button(view.state)
-        record = self._monitor_manager.get_screen_record(monitor_id)
+        record = self._monitor_manager.get_screen_record(screen_uid)
         associated_monitors = record.associated_monitors if record is not None else []
         self._no_associated_monitors_label.setVisible(not associated_monitors)
         for index, card in enumerate(self._associated_monitor_cards):
@@ -775,7 +775,7 @@ class MainWindow(QMainWindow):
                 card.show()
             else:
                 card.hide()
-        pattern_paths = self._loaded_pattern_paths.get(monitor_id, {})
+        pattern_paths = self._loaded_pattern_paths.get(screen_uid, {})
         for component_key, path_field in self._pattern_path_fields.items():
             file_path = pattern_paths.get(component_key, "")
             path_field.setText(Path(file_path).name if file_path else "")
@@ -790,13 +790,13 @@ class MainWindow(QMainWindow):
             "slm_window": self._slm_window_text(view.state),
         }.items():
             self._screen_info_fields[key].setText(value)
-        self._sync_pattern_active_checks(monitor_id)
-        self._sync_pattern_flip_checks(monitor_id)
-        self._show_console_for_screen(monitor_id)
+        self._sync_pattern_active_checks(screen_uid)
+        self._sync_pattern_flip_checks(screen_uid)
+        self._show_console_for_screen(screen_uid)
         self.updatePreview()
 
-    def _sync_pattern_active_checks(self, monitor_id: str) -> None:
-        displayer = self._monitor_manager.get_displayer(monitor_id)
+    def _sync_pattern_active_checks(self, screen_uid: str) -> None:
+        displayer = self._monitor_manager.get_displayer(screen_uid)
         inclusion = displayer.getPatternInclusion() if displayer is not None else (True, True, True)
         for component_key, is_active in zip(
             ("base", "hologram", "modification"), inclusion, strict=True
@@ -806,8 +806,8 @@ class MainWindow(QMainWindow):
             checkbox.setChecked(is_active)
             checkbox.blockSignals(False)
 
-    def _sync_pattern_flip_checks(self, monitor_id: str) -> None:
-        displayer = self._monitor_manager.get_displayer(monitor_id)
+    def _sync_pattern_flip_checks(self, screen_uid: str) -> None:
+        displayer = self._monitor_manager.get_displayer(screen_uid)
         flip_states = (
             displayer.getPatternFlipStates() if displayer is not None else (False, False, False, False, False, False)
         )
@@ -872,23 +872,23 @@ class MainWindow(QMainWindow):
         return state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED)
 
     def _toggle_slm_window(self) -> None:
-        monitor_id = self._selected_monitor_id()
-        if monitor_id is None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
             self._write_console("Error: select a screen before changing the SLM window")
             return
 
-        session = self._monitor_manager.get_session(monitor_id)
+        session = self._monitor_manager.get_session(screen_uid)
         if session is not None and self._is_slm_window_enabled(session.state):
-            self._monitor_manager.deactivate_monitor(monitor_id)
+            self._monitor_manager.deactivate_monitor(screen_uid)
             self._write_console("SLM window disabled.")
             return
 
-        if self._monitor_manager.activate_monitor(monitor_id) is None:
+        if self._monitor_manager.activate_monitor(screen_uid) is None:
             self._write_console("Error: the selected screen is no longer available")
             return
         self._write_console("SLM window enabled.")
 
-    def _selected_monitor_id(self) -> str | None:
+    def _selected_screen_uid(self) -> str | None:
         item = self._list_widget.currentItem()
         if item is None:
             return None
@@ -896,7 +896,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _build_item_label(view: SessionDebugView) -> str:
-        return view.display_name or view.screen_name or view.monitor_id
+        return view.display_name or view.screen_name or view.screen_uid
 
     @staticmethod
     def _build_item_tooltip(view: SessionDebugView) -> str:

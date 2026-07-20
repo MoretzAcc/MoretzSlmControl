@@ -51,7 +51,6 @@ class MonitorManager(QObject):
             record = self._records_by_id.get(descriptor.screen_uid)
             if record is None:
                 record = ScreenRecord(
-                    monitor_id=descriptor.screen_uid,
                     screen_uid=descriptor.screen_uid,
                     display_name=descriptor.display_name,
                     serial_number=descriptor.serial_number,
@@ -89,66 +88,66 @@ class MonitorManager(QObject):
             if session is not None:
                 session.attach_screen(screen)
 
-        for monitor_id, record in self._records_by_id.items():
-            if monitor_id not in current_ids:
+        for screen_uid, record in self._records_by_id.items():
+            if screen_uid not in current_ids:
                 record.is_connected = False
-                self._known_screens.pop(monitor_id, None)
-                session = self._sessions_by_id.get(monitor_id)
+                self._known_screens.pop(screen_uid, None)
+                session = self._sessions_by_id.get(screen_uid)
                 if session is not None:
                     session.detach_screen()
 
         self.recordsChanged.emit()
 
-    def activate_monitor(self, monitor_id: str) -> DisplaySession | None:
-        record = self._records_by_id.get(monitor_id)
+    def activate_monitor(self, screen_uid: str) -> DisplaySession | None:
+        record = self._records_by_id.get(screen_uid)
         if record is None:
             return None
-        session = self._sessions_by_id.get(monitor_id)
+        session = self._sessions_by_id.get(screen_uid)
         if session is None:
             session = DisplaySession(record, self._platform_adapter)
             session.bridge.statsChanged.connect(self._on_session_stats_changed)
             session.bridge.consoleMessage.connect(self._on_session_console_message)
-            self._sessions_by_id[monitor_id] = session
+            self._sessions_by_id[screen_uid] = session
             if record.is_connected:
-                screen = self._known_screens.get(monitor_id)
+                screen = self._known_screens.get(screen_uid)
                 if screen is not None:
                     session.attach_screen(screen)
         session.enable()
         self.recordsChanged.emit()
         return session
 
-    def deactivate_monitor(self, monitor_id: str) -> None:
-        session = self._sessions_by_id.get(monitor_id)
+    def deactivate_monitor(self, screen_uid: str) -> None:
+        session = self._sessions_by_id.get(screen_uid)
         if session is None:
             return
         session.disable()
         self.recordsChanged.emit()
 
-    def get_session(self, monitor_id: str) -> DisplaySession | None:
-        return self._sessions_by_id.get(monitor_id)
+    def get_session(self, screen_uid: str) -> DisplaySession | None:
+        return self._sessions_by_id.get(screen_uid)
 
-    def get_screen_record(self, monitor_id: str) -> ScreenRecord | None:
+    def get_screen_record(self, screen_uid: str) -> ScreenRecord | None:
         """Return the persistent record for a known screen."""
-        return self._records_by_id.get(monitor_id)
+        return self._records_by_id.get(screen_uid)
 
-    def get_displayer(self, monitor_id: str) -> HologramManager | None:
-        session = self.get_session(monitor_id)
+    def get_displayer(self, screen_uid: str) -> HologramManager | None:
+        session = self.get_session(screen_uid)
         if session is None:
             return None
         return session.displayer
 
-    def ensure_displayer(self, monitor_id: str) -> HologramManager | None:
+    def ensure_displayer(self, screen_uid: str) -> HologramManager | None:
         """Return a display manager, creating an inactive session when required."""
-        record = self._records_by_id.get(monitor_id)
+        record = self._records_by_id.get(screen_uid)
         if record is None:
             return None
-        session = self._sessions_by_id.get(monitor_id)
+        session = self._sessions_by_id.get(screen_uid)
         if session is None:
             session = DisplaySession(record, self._platform_adapter)
             session.bridge.statsChanged.connect(self._on_session_stats_changed)
             session.bridge.consoleMessage.connect(self._on_session_console_message)
-            self._sessions_by_id[monitor_id] = session
-            screen = self._known_screens.get(monitor_id)
+            self._sessions_by_id[screen_uid] = session
+            screen = self._known_screens.get(screen_uid)
             if record.is_connected and screen is not None:
                 session.attach_screen(screen)
         return session.displayer
@@ -192,18 +191,17 @@ class MonitorManager(QObject):
 
     def iter_debug_views(self) -> list[SessionDebugView]:
         views: list[SessionDebugView] = []
-        for monitor_id in sorted(self._records_by_id):
-            session = self._sessions_by_id.get(monitor_id)
-            record = self._records_by_id[monitor_id]
+        for screen_uid in sorted(self._records_by_id):
+            session = self._sessions_by_id.get(screen_uid)
+            record = self._records_by_id[screen_uid]
             if session is None:
                 views.append(
                     SessionDebugView(
-                        session_id=record.monitor_id,
+                        session_id=record.screen_uid,
                         heros_name="",
                         state=SessionState.INACTIVE_CONNECTED if record.is_connected else SessionState.INACTIVE_DISCONNECTED,
                         ready_for_frames=False,
                         has_screen_attached=False,
-                        monitor_id=record.monitor_id,
                         screen_uid=record.screen_uid,
                         display_name=record.display_name,
                         serial_number=record.serial_number,
@@ -234,12 +232,12 @@ class MonitorManager(QObject):
 
     def _on_screen_removed(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
-        monitor_id = descriptor.screen_uid
-        record = self._records_by_id.get(monitor_id)
+        screen_uid = descriptor.screen_uid
+        record = self._records_by_id.get(screen_uid)
         if record is not None:
             record.is_connected = False
-        self._known_screens.pop(monitor_id, None)
-        session = self._sessions_by_id.get(monitor_id)
+        self._known_screens.pop(screen_uid, None)
+        session = self._sessions_by_id.get(screen_uid)
         if session is not None:
             session.detach_screen()
         self.recordsChanged.emit()

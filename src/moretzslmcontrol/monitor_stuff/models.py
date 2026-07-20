@@ -35,7 +35,6 @@ class SessionState(StrEnum):
 
 @dataclass(slots=True)
 class ScreenRecord: # A screen can be shown on multiple monitors!
-    monitor_id: str
     screen_uid: str
     display_name: str
     serial_number: str
@@ -78,7 +77,6 @@ class SessionDebugView:
     state: SessionState
     ready_for_frames: bool
     has_screen_attached: bool
-    monitor_id: str
     screen_uid: str
     display_name: str
     serial_number: str

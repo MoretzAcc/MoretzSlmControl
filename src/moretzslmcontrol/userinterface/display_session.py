@@ -22,8 +22,8 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class DisplaySession:
     def __init__(self, screen_record: ScreenRecord, platform_adapter: PlatformAdapter) -> None:
         self.screen_record = screen_record
-        self.session_id = screen_record.monitor_id
-        self.heros_name = f"slm_{screen_record.monitor_id.replace(' ', '_')}"
+        self.session_id = screen_record.screen_uid
+        self.heros_name = f"slm_{screen_record.screen_uid.replace(' ', '_')}"
         self.platform_adapter = platform_adapter
         self.bridge = DisplayBridge(session_id=self.session_id)
         self.displayer = HologramManager(
@@ -108,7 +108,6 @@ class DisplaySession:
             state=self.state,
             ready_for_frames=self.ready_for_frames,
             has_screen_attached=self.has_screen_attached,
-            monitor_id=self.screen_record.monitor_id,
             screen_uid=self.screen_record.screen_uid,
             display_name=self.screen_record.display_name,
             serial_number=self.screen_record.serial_number,

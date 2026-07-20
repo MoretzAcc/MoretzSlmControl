@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def plotHologram(hologram: NDArray[np.float32]) -> None:
+def plotHologram(hologram: NDArray[np.float32], show_scale: bool = True) -> None:
     """Display a phase hologram using a grayscale colour map."""
     try:
         from matplotlib import pyplot as plt
@@ -17,5 +17,6 @@ def plotHologram(hologram: NDArray[np.float32]) -> None:
     fig, ax = plt.subplots()
     image = ax.imshow(hologram, cmap="gray")
     ax.invert_yaxis()
-    #fig.colorbar(image, ax=ax)
+    if show_scale:
+        fig.colorbar(image, ax=ax)
     plt.show()
