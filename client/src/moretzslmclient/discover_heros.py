@@ -18,11 +18,8 @@ logger = logging.getLogger(__name__)
 
 observer = HEROObserver()
 
-def discover() -> dict:
-    return observer._discover()
-
 def discover_slm_heros() -> list[str]:
-    heros = discover()
+    heros = observer._discover()
     return [
         hero["name"]
         for hero in heros.values()
