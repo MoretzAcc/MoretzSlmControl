@@ -5,7 +5,7 @@ from moretzslmclient.file_util import importNpyHologram, importBmpHologram
 from moretzslmclient.bit_map_util import byteToPhase, phaseToByte
 from moretzslmclient.notebook_helpers import plotHologram
 from moretzslmclient.types import SessionStats, SlmHeroConnector
-from moretzslmclient.discover_heros import discover, discover_slm_heros
+from moretzslmclient.discover_heros import discover_slm_heros
 
 __all__ = [
     "SessionStats",
@@ -13,7 +13,6 @@ __all__ = [
     "SlmHeroConnector",
     "SlmHeroNotFoundError",
     "byteToPhase",
-    "discover",
     "discover_slm_heros",
     "importBmpHologram",
     "importNpyHologram",

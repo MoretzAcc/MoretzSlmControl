@@ -23,7 +23,7 @@ class DisplaySession:
     def __init__(self, screen_record: ScreenRecord, platform_adapter: PlatformAdapter) -> None:
         self.screen_record = screen_record
         self.session_id = screen_record.screen_uid
-        self.heros_name = f"slm_{screen_record.screen_uid.replace(' ', '_')}"
+        self.heros_name = f"slm_{screen_record.screen_uid}__{screen_record.display_name.replace(' - ', '_')}"
         self.platform_adapter = platform_adapter
         self.bridge = DisplayBridge(session_id=self.session_id)
         self.displayer = HologramManager(
