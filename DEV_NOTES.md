@@ -1,9 +1,6 @@
-
-
 ```bash
 uv run moretzslmcontrol
 ```
-
 
 ### TODO 
 - ICON
@@ -13,6 +10,7 @@ uv run moretzslmcontrol
 - Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
 - allow fractional values using slider using for modification pattern
 - speed up the modification pattern generation
+- remove duplicate code from client and server
 
 ### TODO Future Ideas 
 - Support SLM with different bit depth than 8

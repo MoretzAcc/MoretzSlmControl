@@ -17,5 +17,5 @@ def plotHologram(hologram: NDArray[np.float32]) -> None:
     fig, ax = plt.subplots()
     image = ax.imshow(hologram, cmap="gray")
     ax.invert_yaxis()
-    fig.colorbar(image, ax=ax)
+    #fig.colorbar(image, ax=ax)
     plt.show()
