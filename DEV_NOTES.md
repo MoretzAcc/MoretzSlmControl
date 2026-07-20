@@ -8,10 +8,15 @@ uv run moretzslmcontrol
 ### TODO 
 - ICON
 - log that session initialized, log that heros activated
+- button to reset session into null state
 - Connection via Heros toggleable
-- Connection via Rest Api toggleable
 - Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
+- allow fractional values using slider using for modification pattern
+- speed up the modification pattern generation
+
+### TODO Future Ideas 
 - Support SLM with different bit depth than 8
+- Connection via Rest Api toggleable
 
 ### TODO in README
 
