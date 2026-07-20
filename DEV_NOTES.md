@@ -2,7 +2,10 @@
 uv run moretzslmcontrol
 ```
 
-### TODO 
+### TODO Bugs
+- Error message is green (Windows) "Error importing base aberration: cannot identify image file 'C:\\Users\\morit\\Downloads\\SteelSeriesGG112.0.0Setup.exe.bmp'"
+
+### TODO Tasks
 - ICON
 - log that session initialized, log that heros activated
 - button to reset session into null state
@@ -11,6 +14,7 @@ uv run moretzslmcontrol
 - allow fractional values using slider using for modification pattern
 - speed up the modification pattern generation
 - remove duplicate code from client and server
+
 
 ### TODO Future Ideas 
 - Support SLM with different bit depth than 8

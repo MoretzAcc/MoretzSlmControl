@@ -6,6 +6,7 @@ Date: 23.03.2026
 from __future__ import annotations
 
 import logging
+from math import floor, log10
 from html import escape
 from pathlib import Path
 from threading import Thread
@@ -64,6 +65,9 @@ class MainWindow(QMainWindow):
         self._shift_sliders: dict[str, QSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
+        self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
+        self._default_modification_inputs: dict[str, str] = {}
+        self._modification_screen_uid: str | None = None
         self._last_modification_parameters: dict[str, tuple[float, ...]] = {}
         self._pattern_active_checks: dict[str, QCheckBox] = {}
         self._pattern_flip_checks: dict[tuple[str, str], QCheckBox] = {}
@@ -81,6 +85,7 @@ class MainWindow(QMainWindow):
         self._list_widget.currentItemChanged.connect(self._update_selected_screen)
 
         self._details_page = self._build_details_page()
+        self._default_modification_inputs = self._modification_input_values()
         self._empty_page = self._build_empty_page()
         self._content_stack = QStackedWidget()
         self._content_stack.addWidget(self._empty_page)
@@ -624,10 +629,16 @@ class MainWindow(QMainWindow):
         return form
 
     def _on_shift_slider_released(self, axis: str) -> None:
-        value = self._shift_sliders[axis].value()
+        try:
+            maximum_shift = self._read_positive_modification_parameter("max_shift")
+        except ValueError as error:
+            self._write_console(f"Error: invalid slider max shift: {error}")
+            return
+        tick_size = self._slider_tick_size(maximum_shift)
+        value = self._shift_sliders[axis].value() * tick_size
         input_field = self._shift_inputs[axis]
         input_field.blockSignals(True)
-        input_field.setText(str(value))
+        input_field.setText(self._format_number(value))
         input_field.blockSignals(False)
         self._update_modification_pattern()
 
@@ -643,8 +654,9 @@ class MainWindow(QMainWindow):
         input_field = self._shift_inputs[axis]
         input_field.setText(self._format_number(clamped_value))
         slider = self._shift_sliders[axis]
+        tick_size = self._slider_tick_size(maximum_shift)
         slider.blockSignals(True)
-        slider.setValue(round(clamped_value))
+        slider.setValue(round(clamped_value / tick_size))
         slider.blockSignals(False)
         self._update_modification_pattern()
 
@@ -663,7 +675,8 @@ class MainWindow(QMainWindow):
             self._write_console(f"Error: invalid shift value: {error}")
             return
 
-        slider_limit = round(maximum_shift)
+        tick_size = self._slider_tick_size(maximum_shift)
+        slider_limit = floor(maximum_shift / tick_size)
         for axis, slider in self._shift_sliders.items():
             slider.blockSignals(True)
             slider.setRange(-slider_limit, slider_limit)
@@ -672,7 +685,7 @@ class MainWindow(QMainWindow):
             clamped_value = max(-maximum_shift, min(maximum_shift, current_value))
             self._shift_inputs[axis].setText(self._format_number(clamped_value))
             slider.blockSignals(True)
-            slider.setValue(round(clamped_value))
+            slider.setValue(round(clamped_value / tick_size))
             slider.blockSignals(False)
         self._update_modification_pattern()
 
@@ -680,6 +693,7 @@ class MainWindow(QMainWindow):
         screen_uid = self._selected_screen_uid()
         if screen_uid is None:
             return
+        self._store_modification_inputs(screen_uid)
 
         try:
             x = float(self._shift_inputs["X"].text())
@@ -732,6 +746,45 @@ class MainWindow(QMainWindow):
         return value
 
     @staticmethod
+    def _slider_tick_size(maximum_shift: float) -> float:
+        return 10 ** floor(log10(maximum_shift / 99.9))
+
+    def _modification_input_values(self) -> dict[str, str]:
+        return {
+            **{axis: input_field.text() for axis, input_field in self._shift_inputs.items()},
+            **{key: field.text() for key, field in self._modification_parameter_fields.items()},
+        }
+
+    def _store_modification_inputs(self, screen_uid: str) -> None:
+        self._modification_inputs_by_screen[screen_uid] = self._modification_input_values()
+
+    def _load_modification_inputs(self, screen_uid: str) -> None:
+        values = self._modification_inputs_by_screen.get(screen_uid, self._default_modification_inputs)
+        for axis, input_field in self._shift_inputs.items():
+            input_field.blockSignals(True)
+            input_field.setText(values[axis])
+            input_field.blockSignals(False)
+        for key, field in self._modification_parameter_fields.items():
+            field.blockSignals(True)
+            field.setText(values[key])
+            field.blockSignals(False)
+
+        try:
+            maximum_shift = self._read_positive_modification_parameter("max_shift")
+            tick_size = self._slider_tick_size(maximum_shift)
+        except ValueError:
+            return
+        slider_limit = floor(maximum_shift / tick_size)
+        for axis, slider in self._shift_sliders.items():
+            slider.blockSignals(True)
+            slider.setRange(-slider_limit, slider_limit)
+            try:
+                slider.setValue(round(float(values[axis]) / tick_size))
+            except ValueError:
+                slider.setValue(0)
+            slider.blockSignals(False)
+
+    @staticmethod
     def _format_number(value: float) -> str:
         return f"{value:g}"
 
@@ -756,6 +809,12 @@ class MainWindow(QMainWindow):
         if screen_uid is None:
             self._content_stack.setCurrentWidget(self._empty_page)
             return
+
+        if screen_uid != self._modification_screen_uid:
+            if self._modification_screen_uid is not None:
+                self._store_modification_inputs(self._modification_screen_uid)
+            self._load_modification_inputs(screen_uid)
+            self._modification_screen_uid = screen_uid
 
         views = {view.screen_uid: view for view in self._monitor_manager.iter_debug_views()}
         view = views.get(screen_uid)
