@@ -7,7 +7,6 @@ Date: 23.03.2026
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
 from pathlib import Path
@@ -17,9 +16,8 @@ from typing import TYPE_CHECKING
 import sys
 import platform as _platform
 
-from PySide6.QtGui import QIcon
-
 from moretzslmcontrol.util.moretz_logger import SetColorfulLogging
+from heros import zenoh
 
 system_name = _platform.system().lower()
 
@@ -35,25 +33,9 @@ elif system_name == "windows":
 else:
     raise Exception(f"Unsupported platform: {system_name}")
 
-
-from heros import zenoh
-
-#configChanges = { # TODO test if this made a diff
-#    "listen/endpoints": ["tcp/0.0.0.0:56102"]
-#}
-#zenoh.session_manager.update_config(configChanges)
-
-"""
-if sys.platform == "win32":
-    app_id = "meinefirma.meineanwendung.1.0"
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
-
-BASE_DIR = Path(__file__).resolve().parent
-ICON_PATH = BASE_DIR / "resources" / "icon.png"
-"""
-
 # Import Qt
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 
 from moretzslmcontrol.userinterface.main_window import MainWindow
 from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
@@ -69,7 +51,11 @@ def run(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv
     app = QApplication(argv)
-    #icon = QIcon(str(ICON_PATH))
+
+    BASE_DIR = Path(__file__).resolve().parent
+    ICON_PATH = BASE_DIR / "assets" / "icon.png"
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
+
     platform_adapter = create_platform_adapter(app.platformName())
     monitor_manager = MonitorManager(app=app, platform_adapter=platform_adapter)
     main_window = MainWindow(monitor_manager=monitor_manager)
@@ -79,6 +65,7 @@ def run(argv: list[str] | None = None) -> int:
     finally:
         monitor_manager.shutdown()
         zenoh.session_manager.force_close()
+
 
 def main() -> None:
     print("Hello from moretzslmcontrol!")
