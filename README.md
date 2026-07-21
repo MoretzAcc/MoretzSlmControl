@@ -38,15 +38,20 @@ uv run moretzslmcontrol
 
 Each active SLM is exposed through [HEROS](https://pypi.org/project/heros/). This allows another process on the same computer, or a process on another device in the same network, to control the SLM without interacting with the GUI directly. Each screen has its own HERO name and console output.
 
-The lightweight client is available as a separate package and supports Python 3.11 or newer:
+The lightweight client is available as a separate package and supports Python 3.11 or newer.
+To import the client in any of your projects:
 
+Using pip or conda:
 ```bash
-uv add path/to/MoretzSlmControl/client
+python -m pip install "moretzslmclient @ git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
 ```
 
-```python
-from moretzslmclient import SlmHeroApi
+Using uv:
+```bash
+uv add "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
 ```
+
+How to use it is described in /client/README.md.
 
 ## Development
 
