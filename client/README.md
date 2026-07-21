@@ -15,12 +15,7 @@ uv add "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=clien
 
 ### Example
 
-To find slm devices on the network:
-```python
-
-
-```
-
+A full example can be found in the `examples` directory.
 
 To apply a hologram pattern to the SLM:
 
