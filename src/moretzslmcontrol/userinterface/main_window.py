@@ -898,7 +898,7 @@ class MainWindow(QMainWindow):
             f"{edid.manufacturer or '—'} ({edid.manufacturer_pnp_id or '—'})"
         )
         fields["product_id"].setText(str(edid.product_id))
-        fields["manufactured"].setText(f"{edid.year}/{edid.week}")
+        fields["manufactured"].setText(f"{edid.year} / {edid.week}")
         fields["name"].setText(edid.name or "—")
         fields["serial"].setText(str(edid.serial) if edid.serial is not None else "—")
 

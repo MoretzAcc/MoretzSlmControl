@@ -43,7 +43,7 @@ To import the client in any of your projects:
 
 Using pip or conda:
 ```bash
-python -m pip install "moretzslmclient @ git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
+python -m pip install "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
 ```
 
 Using uv:
