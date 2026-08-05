@@ -14,7 +14,7 @@ uv run moretzslmcontrol
     - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
 
 ### TODO Tasks
-- Expose disabling of SLM display into api
+- Expose enabling/disabling of SLM display into api
 - Sending a pattern via heros should enable the screen by default
 - add timestamps to the logs
 - when screen is disabled, cross out the preview of the sums of the holograms
