@@ -14,17 +14,21 @@ uv run moretzslmcontrol
     - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
 
 ### TODO Tasks
+- Expose disabling of SLM display into api
+- Sending a pattern via heros should enable the screen by default
+- add timestamps to the logs
+- when screen is disabled, cross out the preview of the sums of the holograms
 - log that session initialized, log that heros activated
 - button to reset session into null state
 - Connection via Heros toggleable
-- allow fractional values using slider using for modification pattern
 - speed up program
   - speed up the modification pattern generation
   - speed up the hologram generation
+  - remove freeze on parameter change
 - remove duplicate code from client and server
 - make plotHologram faster
 - Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
-- Expose disabling of SLM display into api
+
 
 ### TODO Future Ideas 
 - Support SLM with different bit depth than 8

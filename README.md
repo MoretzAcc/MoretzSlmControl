@@ -4,13 +4,13 @@ Desktop application for controlling spatial light modulator (SLM) displays.
 
 > **AI notice:** This project was developed with AI assistance.
 
-Tested on:
+Tested on Operating Systems:
 
 - Windows 11
 - Fedora 44 KDE Wayland
 - Ubuntu 24.04 GNOME Wayland
 
-Using Spatial Light Modulators from:
+Tested using Spatial Light Modulators from:
 
 - Holoeye
 - Hamamatsu
