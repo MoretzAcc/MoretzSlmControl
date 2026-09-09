@@ -69,3 +69,6 @@ uv run mypy
 
 - Changing monitor settings while the application is running, such as display scaling, is not detected by Refresh.
 - EDID detection is unstable on Linux. It has been tested with KDE Wayland and Ubuntu GNOME Wayland.
+
+
+## Run tests

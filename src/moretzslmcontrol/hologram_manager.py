@@ -21,10 +21,12 @@ from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.math_util import wrap_phase
+from moretzslmcontrol.util.patterns.zernike import makeCartGrid
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     from moretzslmcontrol.userinterface.display_bridge import DisplayBridge
+    from zernike import RZern
 
 
 logger = logging.getLogger(__name__)
@@ -44,12 +46,15 @@ class HologramManager:
 
         self._correctionPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
         self._hologramPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
+        self._zernikePattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
         self._modificationPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
         self._totalPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
 
         self._includeCorrectionPattern: bool = True
         self._includeHologramPattern: bool = True
+        self._includeZernikePattern: bool = True
         self._includeModificationPattern: bool = True
+        self._zernike_cart_grid: RZern | None = None
 
         self._flipCorrectionPatternHorizontally: bool = False
         self._flipHologramPatternHorizontally: bool = False
@@ -58,7 +63,8 @@ class HologramManager:
         self._flipHologramPatternVertically: bool = False
         self._flipModificationPatternVertically: bool = False
 
-        self._latestFrame: NDArray[np.uint8] = np.zeros(self.shape, dtype=np.uint8)
+        half_dtype_range = (np.iinfo(np.uint8).max + 1) // 2
+        self._latestFrame: NDArray[np.uint8] = np.full(self.shape, half_dtype_range, dtype=np.uint8)
         self._latestRevision: int = 0
         self._stats = SessionStats()
         self.heroConnector = SlmHeroConnector(self, self.herosName) # TODO make this toggleable somehow
@@ -79,6 +85,12 @@ class HologramManager:
     def enableModificationPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:
             self._includeModificationPattern = value
+        if update:
+            self.publishCurrentPattern()
+
+    def enableZernikePattern(self, value: bool = True, update: bool = True) -> None:
+        with self._lock:
+            self._includeZernikePattern = value
         if update:
             self.publishCurrentPattern()
 
@@ -111,6 +123,7 @@ class HologramManager:
                 self._flipCorrectionPatternHorizontally,
                 self._flipCorrectionPatternVertically,
             )
+            self._includeCorrectionPattern = True
         if update:
             self.publishCurrentPattern()
 
@@ -125,6 +138,7 @@ class HologramManager:
                 self._flipHologramPatternHorizontally,
                 self._flipHologramPatternVertically,
             )
+            self._includeHologramPattern = True
         if update:
             self.publishCurrentPattern()
 
@@ -139,8 +153,33 @@ class HologramManager:
                 self._flipModificationPatternHorizontally,
                 self._flipModificationPatternVertically,
             )
+            self._includeModificationPattern = True
         if update:
             self.publishCurrentPattern()
+
+    def setZernikePattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
+        if phaseArr is None:
+            hologram = self._getBlankPattern()
+        else:
+            hologram = self._validate_and_resize(phaseArr, "Zernike pattern", warn_on_resize=False)
+        with self._lock:
+            self._zernikePattern = self._flip_imported_pattern(
+                wrap_phase(hologram),
+                flip_horizontally=False,
+                flip_vertically=False,
+            )
+            self._includeZernikePattern = True
+        if update:
+            self.publishCurrentPattern()
+
+    def getZernikeCartGrid(self) -> RZern:
+        """Create the screen-sized Zernike grid on first use and reuse it afterwards."""
+        with self._lock:
+            if self._zernike_cart_grid is None:
+                height, width = self.shape
+                self._zernike_cart_grid = makeCartGrid(Nx=width, Ny=height, dx=1.0, dy=1.0)
+            # noinspection PyTypeChecker
+            return self._zernike_cart_grid
 
     def publishCurrentPattern(self) -> bool:
         with (self._lock):
@@ -150,6 +189,8 @@ class HologramManager:
                 self._totalPattern += self._correctionPattern
             if self._includeHologramPattern:
                 self._totalPattern += self._hologramPattern
+            if self._includeZernikePattern:
+                self._totalPattern += self._zernikePattern
             if self._includeModificationPattern:
                 self._totalPattern += self._modificationPattern
 
@@ -199,24 +240,28 @@ class HologramManager:
 
     def getPatternSnapshots(
         self,
-    ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
-        """Return safe copies of the correction, hologram, modification, and total patterns."""
+    ) -> tuple[
+        NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]
+    ]:
+        """Return safe copies of the correction, hologram, Zernike, modification, and total patterns."""
         with self._lock:
             return (
                 self._correctionPattern.copy(),
                 self._hologramPattern.copy(),
+                self._zernikePattern.copy(),
                 self._modificationPattern.copy(),
                 self._totalPattern.copy(),
             )
 
-    def getPatternInclusion(self) -> tuple[bool, bool, bool]:
-        """Return whether correction, hologram, and modification patterns are included."""
+    def getPatternInclusion(self) -> dict[str, bool]:
+        """Return named inclusion states without coupling callers to component order."""
         with self._lock:
-            return (
-                self._includeCorrectionPattern,
-                self._includeHologramPattern,
-                self._includeModificationPattern,
-            )
+            return {
+                "base": self._includeCorrectionPattern,
+                "hologram": self._includeHologramPattern,
+                "zernike": self._includeZernikePattern,
+                "modification": self._includeModificationPattern,
+            }
 
     def getPatternFlipStates(self) -> tuple[bool, bool, bool, bool, bool, bool]:
         """Return horizontal and vertical flip states for all three component patterns."""
@@ -246,6 +291,7 @@ class HologramManager:
             flipped_pattern = np.fliplr(pattern) if direction == "horizontal" else np.flipud(pattern)
             setattr(self, pattern_name, np.ascontiguousarray(flipped_pattern, dtype=np.float32))
             setattr(self, flag_name, value)
+            setattr(self, f"_include{component.capitalize()}Pattern", True)
         if update:
             self.publishCurrentPattern()
 

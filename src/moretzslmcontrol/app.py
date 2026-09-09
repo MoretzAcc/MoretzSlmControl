@@ -68,5 +68,5 @@ def run(argv: list[str] | None = None) -> int:
 
 
 def main() -> None:
-    print("Hello from moretzslmcontrol!")
+    print("Starting moretzslmcontrol...")
     raise SystemExit(run())

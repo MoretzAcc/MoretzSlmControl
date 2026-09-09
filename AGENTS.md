@@ -48,7 +48,7 @@ uv run ruff check client/src
 
 ## Current repo realities
 
-- There is no test suite in the repository yet.
+- API contract checks live in `tests/` and use the standard-library `unittest` runner.
 - The application is GUI-first; many changes are best verified by running the app.
 - Platform-specific monitor code exists for Linux and Windows under `monitor_stuff/platform`.
 - The client package must remain independent of GUI, monitor, and SLM-server modules; it may depend only on its own code, HEROS, and NumPy.
@@ -67,8 +67,9 @@ uv run ruff check client/src
 For code changes, use the lightest verification that matches the risk:
 
 1. `uv run ruff check .`
-2. If UI or runtime behavior changed, run `uv run moretzslmcontrol` when the environment supports GUI execution.
-3. If a task affects platform-specific code, call out which platforms were not verified.
+2. `uv run python -m unittest discover -s tests` when changing the server/client HERO contract.
+3. If UI or runtime behavior changed, run `uv run moretzslmcontrol` when the environment supports GUI execution.
+4. If a task affects platform-specific code, call out which platforms were not verified.
 
 ## Notes for future work
 

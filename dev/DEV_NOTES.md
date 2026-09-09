@@ -2,8 +2,14 @@
 uv run moretzslmcontrol
 ```
 
+Run unit tests:
+```bash
+uv run tests
+```
+oder das hier? uv run python -m unittest discover -s tests
+
+
 ### TODO Bugs / Issues
-- Error message is green (Windows) "Error importing base aberration: cannot identify image file 'C:\\Users\\morit\\Downloads\\SteelSeriesGG112.0.0Setup.exe.bmp'"
 - Windows Aero Peek, one idea to fix is in anti_aero_peak.py
 - Control Window may be hidden behind slm display windows -> stupid people can hardlock themselves 
   - This can happen through activation of the display over the control software
@@ -12,12 +18,12 @@ uv run moretzslmcontrol
   - This can happen via moving the control window to a different monitor
     - solution: detect movement. After movement if on a monitor with active display, teleport back onto primary monitor / monitor with no active display
     - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
+- Refresh Button does nothing as of now
+- Scroll wheel kann slider ändern, hat aber keinen effekt
 
 ### TODO Tasks
 - Expose enabling/disabling of SLM display into api
 - Sending a pattern via heros should enable the screen by default
-- add timestamps to the logs
-- when screen is disabled, cross out the preview of the sums of the holograms
 - log that session initialized, log that heros activated
 - button to reset session into null state
 - Connection via Heros toggleable
@@ -28,7 +34,8 @@ uv run moretzslmcontrol
 - remove duplicate code from client and server
 - make plotHologram faster
 - Default Hologram that displays 0, 255 with a text printed on top, and in the center is a phase vortex to generate donut
-
+- Zernike params align centered
+- Method hologram_manager.py -> _set_pattern_flip stinks
 
 ### TODO Future Ideas 
 - Support SLM with different bit depth than 8
@@ -43,3 +50,17 @@ uv run moretzslmcontrol
 - Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).
   → Aggressive scaling or fractional scaling can cause problems here.
 - Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
+
+# Changelog
+### 26-09-09
+
+Changed:
+- Moved Total Hologram to top left
+- Crossing out inactive holograms instead of making them gray
+- Total sum is also crossed out when SLM window is deactivated
+- when screen is disabled, cross out the preview of the sums of the holograms
+- Changing a Pattern will set it to active
+
+Fixed:
+- add timestamps to the logs
+- Error message is green (Windows) "Error importing base aberration: cannot identify image file 'C:\\Users\\morit\\Downloads\\SteelSeriesGG112.0.0Setup.exe.bmp'"

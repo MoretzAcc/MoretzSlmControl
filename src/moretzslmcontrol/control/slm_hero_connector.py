@@ -44,6 +44,10 @@ class SlmHeroConnector(LocalHERO):
         self._log_setter("enableModificationPattern")
         self._hologram_manager.enableModificationPattern(value, update)
 
+    def enableZernikePattern(self, value: bool = True, update: bool = True) -> None:
+        self._log_setter("enableZernikePattern")
+        self._hologram_manager.enableZernikePattern(value, update)
+
     def setFlipCorrectionPatternHorizontally(self, value: bool, update: bool = True) -> None:
         self._log_setter("setFlipCorrectionPatternHorizontally")
         self._hologram_manager.setFlipCorrectionPatternHorizontally(value, update)
@@ -86,6 +90,10 @@ class SlmHeroConnector(LocalHERO):
         self._log_setter("setModificationPattern")
         self._hologram_manager.setModificationPattern(phaseArr, update)
 
+    def setZernikePattern(self, phaseArr: NDArray[np.floating] | None, update: bool = True) -> None:
+        self._log_setter("setZernikePattern")
+        self._hologram_manager.setZernikePattern(phaseArr, update)
+
     def _log_setter(self, method_name: str) -> None:
         self._hologram_manager.write_to_console(f"Heros: {method_name} requested.")
 
@@ -100,11 +108,13 @@ class SlmHeroConnector(LocalHERO):
 
     def getPatternSnapshots(
         self,
-    ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
+    ) -> tuple[
+        NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]
+    ]:
         return self._hologram_manager.getPatternSnapshots()
 
-    def getPatternInclusion(self) -> tuple[bool, bool, bool]:
-        """Return whether correction, hologram, and modification patterns are included."""
+    def getPatternInclusion(self) -> dict[str, bool]:
+        """Return named inclusion states without coupling callers to component order."""
         return self._hologram_manager.getPatternInclusion()
 
     def getPatternFlipStates(self) -> tuple[bool, bool, bool, bool, bool, bool]:

@@ -41,7 +41,8 @@ from moretzslmcontrol.monitor_stuff.models import SessionState
 from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
-from moretzslmcontrol.util.pattern_modification import makeSlmPhaseForSingleFocalSpot
+from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
+from moretzslmcontrol.util.patterns.zernike import makePattern, zernike_modes, zernike_order
 
 if TYPE_CHECKING:
     from moretzslmcontrol.monitor_stuff.models import SessionDebugView
@@ -49,6 +50,26 @@ if TYPE_CHECKING:
     from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 
 logger = logging.getLogger(__name__)
+
+crossout_thickness = 0.08
+
+
+def _cross_out_preview(preview_bytes: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Overlay a relative-width X by shifting its pixels through half the dtype range."""
+    height, width = preview_bytes.shape
+    rows = np.linspace(0.0, 1.0, height)[:, np.newaxis]
+    columns = np.linspace(0.0, 1.0, width)[np.newaxis, :]
+    cross_mask = (np.abs(rows - columns) <= crossout_thickness / 2) | (
+        np.abs(rows + columns - 1) <= crossout_thickness / 2
+    )
+    cross_mask_wide = (np.abs(rows - columns) <= crossout_thickness) | (
+            np.abs(rows + columns - 1) <= crossout_thickness
+    )
+    crossed_out = preview_bytes.copy()
+    crossed_out[cross_mask_wide] = np.iinfo(crossed_out.dtype).max - 2
+    crossed_out[cross_mask] = 1
+    return crossed_out
+
 
 class MainWindow(QMainWindow):
     """Presentation-only control surface for the known SLM displays."""
@@ -69,6 +90,11 @@ class MainWindow(QMainWindow):
         self._default_modification_inputs: dict[str, str] = {}
         self._modification_screen_uid: str | None = None
         self._last_modification_parameters: dict[str, tuple[float, ...]] = {}
+        self._zernike_parameter_fields: dict[str, QLineEdit] = {}
+        self._zernike_inputs_by_screen: dict[str, dict[str, str]] = {}
+        self._default_zernike_inputs: dict[str, str] = {}
+        self._zernike_screen_uid: str | None = None
+        self._last_zernike_parameters: dict[str, tuple[float, ...]] = {}
         self._pattern_active_checks: dict[str, QCheckBox] = {}
         self._pattern_flip_checks: dict[tuple[str, str], QCheckBox] = {}
         self._console_screen_uid: str | None = None
@@ -86,6 +112,7 @@ class MainWindow(QMainWindow):
 
         self._details_page = self._build_details_page()
         self._default_modification_inputs = self._modification_input_values()
+        self._default_zernike_inputs = self._zernike_input_values()
         self._empty_page = self._build_empty_page()
         self._content_stack = QStackedWidget()
         self._content_stack.addWidget(self._empty_page)
@@ -165,10 +192,18 @@ class MainWindow(QMainWindow):
         screen_information.setMinimumWidth(360)
         information_row.addWidget(screen_information)
         information_row.addWidget(self._build_monitor_information_group(), 1)
+        information_row.addWidget(self._build_applied_hologram_group())
         page_layout.addLayout(information_row)
         page_layout.addWidget(self._build_pattern_group(), 2)
         page_layout.addWidget(self._build_console_group())
         return page
+
+    def _build_applied_hologram_group(self) -> QGroupBox:
+        group = QGroupBox("Applied Hologram")
+        group.setMinimumWidth(280)
+        layout = QVBoxLayout(group)
+        layout.addWidget(self._build_pattern_component(None, component_key="total"))
+        return group
 
     def _build_screen_information_group(self) -> QGroupBox:
         group = QGroupBox("Screen information")
@@ -252,33 +287,37 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._build_operator_label("+"))
         layout.addWidget(
             self._build_pattern_component(
-                "Modification Pattern", component_key="modification", has_shift_controls=True
+                "Zernike Pattern", component_key="zernike", has_zernike_fields=True
             ),
             1,
         )
-        layout.addWidget(self._build_operator_label("="))
+        layout.addWidget(self._build_operator_label("+"))
         layout.addWidget(
-            self._build_pattern_component("Applied Hologram", component_key="total"),
+            self._build_pattern_component(
+                "Modification Pattern", component_key="modification", has_shift_controls=True
+            ),
             1,
         )
         return group
 
     def _build_pattern_component(
         self,
-        title: str,
+        title: str | None,
         *,
         component_key: str | None = None,
         has_file_selector: bool = False,
         has_shift_controls: bool = False,
+        has_zernike_fields: bool = False,
     ) -> QWidget:
         component = QWidget()
         layout = QVBoxLayout(component)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
 
-        title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
+        if title is not None:
+            title_label = QLabel(title)
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(title_label)
 
         preview = QLabel("Preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -332,6 +371,9 @@ class MainWindow(QMainWindow):
             for axis in ("X", "Y", "Z"):
                 layout.addLayout(self._build_shift_row(axis))
             layout.addLayout(self._build_modification_parameter_fields())
+
+        if has_zernike_fields:
+            layout.addLayout(self._build_zernike_parameter_fields())
 
         layout.addStretch()
         return component
@@ -423,6 +465,8 @@ class MainWindow(QMainWindow):
             displayer.enableCorrectionPattern(is_active, update=False)
         elif component_key == "hologram":
             displayer.enableHologramPattern(is_active, update=False)
+        elif component_key == "zernike":
+            displayer.enableZernikePattern(is_active, update=False)
         elif component_key == "modification":
             displayer.enableModificationPattern(is_active, update=False)
         else:
@@ -470,17 +514,19 @@ class MainWindow(QMainWindow):
 
         patterns = dict(
             zip(
-                ("base", "hologram", "modification", "total"),
+                ("base", "hologram", "zernike", "modification", "total"),
                 displayer.getPatternSnapshots(),
                 strict=True,
             )
         )
-        correction_active, hologram_active, modification_active = displayer.getPatternInclusion()
+        inclusion = displayer.getPatternInclusion()
+        session = self._monitor_manager.get_session(screen_uid)
         active_by_component = {
-            "base": correction_active,
-            "hologram": hologram_active,
-            "modification": modification_active,
-            "total": True,
+            "base": inclusion["base"],
+            "hologram": inclusion["hologram"],
+            "zernike": inclusion["zernike"],
+            "modification": inclusion["modification"],
+            "total": session is not None and self._is_slm_window_enabled(session.state),
         }
         for component_key, pattern in patterns.items():
             self._set_preview_image(
@@ -499,11 +545,10 @@ class MainWindow(QMainWindow):
         target_height = max(1, round(height * scale))
         row_indices = np.linspace(0, height - 1, target_height, dtype=np.intp)
         column_indices = np.linspace(0, width - 1, target_width, dtype=np.intp)
-        if active:
-            preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
-            preview_bytes = phaseToByte(preview_phase)
-        else:
-            preview_bytes = np.full((target_height, target_width), 128, dtype=np.uint8)
+        preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
+        preview_bytes = phaseToByte(preview_phase)
+        if not active:
+            preview_bytes = _cross_out_preview(preview_bytes)
         image = QImage(
             preview_bytes.data,
             target_width,
@@ -523,9 +568,11 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _console_level_and_message(message: str) -> tuple[str, str]:
-        for prefix, level in (("Error:", "error"), ("Warning:", "warning")):
-            if message.startswith(prefix):
-                return level, message.removeprefix(prefix).strip()
+        for label, level in (("Error", "error"), ("Warning", "warning"), ("Info", "info")):
+            for separator in (":", " "):
+                prefix = f"{label}{separator}"
+                if message.startswith(prefix):
+                    return level, message.removeprefix(prefix).strip()
         return "info", message
 
     @Slot(str)
@@ -538,13 +585,16 @@ class MainWindow(QMainWindow):
         if not force and self._console_screen_uid == screen_uid:
             return
         self._console.clear()
-        for level, message in self._monitor_manager.get_console_entries(screen_uid):
-            self._append_console_entry(level, message)
+        for timestamp, level, message in self._monitor_manager.get_console_entries(screen_uid):
+            self._append_console_entry(timestamp, level, message)
         self._console_screen_uid = screen_uid
 
-    def _append_console_entry(self, level: str, message: str) -> None:
+    def _append_console_entry(self, timestamp: str, level: str, message: str) -> None:
         color = {"error": "#d32f2f", "warning": "#ef6c00", "info": "#2e7d32"}.get(level, "#2e7d32")
-        self._console.append(f'<span style="color: {color};">{escape(message)}</span>')
+        label = {"error": "Error", "warning": "Warning", "info": "Info"}.get(level, "Info")
+        self._console.append(
+            f'[{escape(timestamp)}] <span style="color: {color};">{label}</span>: {escape(message)}'
+        )
 
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -626,6 +676,21 @@ class MainWindow(QMainWindow):
                 field_layout.addWidget(QLabel(unit))
             field_layout.addStretch()
             form.addRow(f"{label}:", field_row)
+        return form
+
+    def _build_zernike_parameter_fields(self) -> QFormLayout:
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        for name, (order, _azimuthal_order) in zernike_modes.items():
+            if order > zernike_order:
+                continue
+            field = QLineEdit("0")
+            field.setMaximumWidth(70)
+            field.setAlignment(Qt.AlignmentFlag.AlignRight)
+            field.setValidator(QDoubleValidator(field))
+            field.editingFinished.connect(self._update_zernike_pattern)
+            self._zernike_parameter_fields[name] = field
+            form.addRow(f"{name}:", field)
         return form
 
     def _on_shift_slider_released(self, axis: str) -> None:
@@ -739,6 +804,40 @@ class MainWindow(QMainWindow):
         self._last_modification_parameters[screen_uid] = parameters
         self.updatePreview()
 
+    def _update_zernike_pattern(self) -> None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
+            return
+        self._store_zernike_inputs(screen_uid)
+
+        try:
+            aberrations = {
+                name: float(field.text()) for name, field in self._zernike_parameter_fields.items()
+            }
+        except ValueError as error:
+            self._write_console(f"Error: invalid Zernike parameter: {error}")
+            return
+
+        parameters = tuple(aberrations.values())
+        if self._last_zernike_parameters.get(screen_uid) == parameters:
+            return
+
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
+        if displayer is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+        try:
+            pattern = makePattern(displayer.getZernikeCartGrid(), aberrations)
+            displayer.setZernikePattern(np.asarray(pattern, dtype=np.float32))
+        except PatternSizeMismatchError:
+            return
+        except Exception as error:
+            self._write_console(f"Error: could not generate Zernike pattern: {error}")
+            return
+
+        self._last_zernike_parameters[screen_uid] = parameters
+        self.updatePreview()
+
     def _read_positive_modification_parameter(self, key: str) -> float:
         value = float(self._modification_parameter_fields[key].text())
         if value <= 0:
@@ -757,6 +856,12 @@ class MainWindow(QMainWindow):
 
     def _store_modification_inputs(self, screen_uid: str) -> None:
         self._modification_inputs_by_screen[screen_uid] = self._modification_input_values()
+
+    def _zernike_input_values(self) -> dict[str, str]:
+        return {name: field.text() for name, field in self._zernike_parameter_fields.items()}
+
+    def _store_zernike_inputs(self, screen_uid: str) -> None:
+        self._zernike_inputs_by_screen[screen_uid] = self._zernike_input_values()
 
     def _load_modification_inputs(self, screen_uid: str) -> None:
         values = self._modification_inputs_by_screen.get(screen_uid, self._default_modification_inputs)
@@ -783,6 +888,13 @@ class MainWindow(QMainWindow):
             except ValueError:
                 slider.setValue(0)
             slider.blockSignals(False)
+
+    def _load_zernike_inputs(self, screen_uid: str) -> None:
+        values = self._zernike_inputs_by_screen.get(screen_uid, self._default_zernike_inputs)
+        for name, field in self._zernike_parameter_fields.items():
+            field.blockSignals(True)
+            field.setText(values[name])
+            field.blockSignals(False)
 
     @staticmethod
     def _format_number(value: float) -> str:
@@ -815,6 +927,12 @@ class MainWindow(QMainWindow):
                 self._store_modification_inputs(self._modification_screen_uid)
             self._load_modification_inputs(screen_uid)
             self._modification_screen_uid = screen_uid
+
+        if screen_uid != self._zernike_screen_uid:
+            if self._zernike_screen_uid is not None:
+                self._store_zernike_inputs(self._zernike_screen_uid)
+            self._load_zernike_inputs(screen_uid)
+            self._zernike_screen_uid = screen_uid
 
         views = {view.screen_uid: view for view in self._monitor_manager.iter_debug_views()}
         view = views.get(screen_uid)
@@ -856,13 +974,15 @@ class MainWindow(QMainWindow):
 
     def _sync_pattern_active_checks(self, screen_uid: str) -> None:
         displayer = self._monitor_manager.get_displayer(screen_uid)
-        inclusion = displayer.getPatternInclusion() if displayer is not None else (True, True, True)
-        for component_key, is_active in zip(
-            ("base", "hologram", "modification"), inclusion, strict=True
-        ):
+        inclusion = (
+            displayer.getPatternInclusion()
+            if displayer is not None
+            else {"base": True, "hologram": True, "zernike": True, "modification": True}
+        )
+        for component_key in ("base", "hologram", "zernike", "modification"):
             checkbox = self._pattern_active_checks[component_key]
             checkbox.blockSignals(True)
-            checkbox.setChecked(is_active)
+            checkbox.setChecked(inclusion[component_key])
             checkbox.blockSignals(False)
 
     def _sync_pattern_flip_checks(self, screen_uid: str) -> None:

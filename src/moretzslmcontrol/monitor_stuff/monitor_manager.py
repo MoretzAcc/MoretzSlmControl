@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, Slot
@@ -36,7 +37,7 @@ class MonitorManager(QObject):
         self._records_by_id: dict[str, ScreenRecord] = {}
         self._sessions_by_id: dict[str, DisplaySession] = {}
         self._known_screens: dict[str, QScreen] = {}
-        self._console_entries_by_id: dict[str, deque[tuple[str, str]]] = {}
+        self._console_entries_by_id: dict[str, deque[tuple[str, str, str]]] = {}
 
         self._app.screenAdded.connect(self._on_screen_added)
         self._app.screenRemoved.connect(self._on_screen_removed)
@@ -171,10 +172,11 @@ class MonitorManager(QObject):
         display_name = record.display_name if record is not None else screen_uid
         log_method("[%s] %s", display_name, message)
         entries = self._console_entries_by_id.setdefault(screen_uid, deque(maxlen=500))
-        entries.append((level, message))
+        timestamp = datetime.now().astimezone().strftime("%H:%M:%S")
+        entries.append((timestamp, level, message))
         self.consoleChanged.emit(screen_uid)
 
-    def get_console_entries(self, screen_uid: str) -> tuple[tuple[str, str], ...]:
+    def get_console_entries(self, screen_uid: str) -> tuple[tuple[str, str, str], ...]:
         """Return the retained console entries for one screen in chronological order."""
         return tuple(self._console_entries_by_id.get(screen_uid, ()))
 
