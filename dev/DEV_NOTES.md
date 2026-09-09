@@ -59,6 +59,8 @@ uv run python -m unittest discover -s tests
 
 ### 26-09-09
 
+Version Bump: 0.3.1 -> 0.3.2
+
 ##### Breaking Changes:
 
 - getPatternInclusion now returns dict instead of tuple of bools

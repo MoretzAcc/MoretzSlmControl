@@ -33,47 +33,47 @@ class SlmHeroConnector(LocalHERO):
         self._destroy_hero()
 
     def enableSlmWindow(self, value: bool = True) -> None:
-        self._log_setter("enableSlmWindow")
+        self._log_setter("enableSlmWindow", value)
         self._hologram_manager.enableSlmWindow(value)
 
     def enableCorrectionPattern(self, value: bool = True, update: bool = True) -> None:
-        self._log_setter("enableCorrectionPattern")
+        self._log_setter("enableCorrectionPattern", value)
         self._hologram_manager.enableCorrectionPattern(value, update)
 
     def enableHologramPattern(self, value: bool = True, update: bool = True) -> None:
-        self._log_setter("enableHologramPattern")
+        self._log_setter("enableHologramPattern", value)
         self._hologram_manager.enableHologramPattern(value, update)
 
     def enableModificationPattern(self, value: bool = True, update: bool = True) -> None:
-        self._log_setter("enableModificationPattern")
+        self._log_setter("enableModificationPattern", value)
         self._hologram_manager.enableModificationPattern(value, update)
 
     def enableZernikePattern(self, value: bool = True, update: bool = True) -> None:
-        self._log_setter("enableZernikePattern")
+        self._log_setter("enableZernikePattern", value)
         self._hologram_manager.enableZernikePattern(value, update)
 
     def setFlipCorrectionPatternHorizontally(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipCorrectionPatternHorizontally")
+        self._log_setter("setFlipCorrectionPatternHorizontally", value)
         self._hologram_manager.setFlipCorrectionPatternHorizontally(value, update)
 
     def setFlipCorrectionPatternVertically(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipCorrectionPatternVertically")
+        self._log_setter("setFlipCorrectionPatternVertically", value)
         self._hologram_manager.setFlipCorrectionPatternVertically(value, update)
 
     def setFlipHologramPatternHorizontally(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipHologramPatternHorizontally")
+        self._log_setter("setFlipHologramPatternHorizontally", value)
         self._hologram_manager.setFlipHologramPatternHorizontally(value, update)
 
     def setFlipHologramPatternVertically(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipHologramPatternVertically")
+        self._log_setter("setFlipHologramPatternVertically", value)
         self._hologram_manager.setFlipHologramPatternVertically(value, update)
 
     def setFlipModificationPatternHorizontally(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipModificationPatternHorizontally")
+        self._log_setter("setFlipModificationPatternHorizontally", value)
         self._hologram_manager.setFlipModificationPatternHorizontally(value, update)
 
     def setFlipModificationPatternVertically(self, value: bool, update: bool = True) -> None:
-        self._log_setter("setFlipModificationPatternVertically")
+        self._log_setter("setFlipModificationPatternVertically", value)
         self._hologram_manager.setFlipModificationPatternVertically(value, update)
 
     def setCorrectionPattern(
@@ -98,8 +98,9 @@ class SlmHeroConnector(LocalHERO):
         self._log_setter("setZernikePattern")
         self._hologram_manager.setZernikePattern(phaseArr, update)
 
-    def _log_setter(self, method_name: str) -> None:
-        self._hologram_manager.write_to_console(f"Heros: {method_name} requested.")
+    def _log_setter(self, method_name: str, value: bool | None = None) -> None:
+        value_text = "" if value is None else f" with value={value}"
+        self._hologram_manager.write_to_console(f"Heros: {method_name} requested{value_text}.")
 
     def getLastFrameSnapshot(self) -> tuple[int, NDArray[np.uint8]]:
         return self._hologram_manager.getLastFrameSnapshot()
