@@ -69,9 +69,9 @@ class HologramManager:
         self._stats = SessionStats()
         self.heroConnector = SlmHeroConnector(self, self.herosName) # TODO make this toggleable somehow
 
-    def toggleSlmWindow(self) -> None:
-        """Request an SLM output-window state change on the GUI thread."""
-        self._bridge.request_slm_window_toggle()
+    def enableSlmWindow(self, value: bool = True) -> None:
+        """Request an explicit SLM output-window state on the GUI thread."""
+        self._bridge.request_slm_window_enable(value)
 
     def enableCorrectionPattern(self, value: bool = True, update: bool = True) -> None:
         with self._lock:

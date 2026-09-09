@@ -144,7 +144,7 @@ class MonitorManager(QObject):
         session = DisplaySession(record, self._platform_adapter)
         session.bridge.statsChanged.connect(self._on_session_stats_changed)
         session.bridge.consoleMessage.connect(self._on_session_console_message)
-        session.bridge.slmWindowToggleRequested.connect(self._on_slm_window_toggle_requested)
+        session.bridge.slmWindowEnableRequested.connect(self._on_slm_window_enable_requested)
         self._sessions_by_id[record.screen_uid] = session
         screen = self._known_screens.get(record.screen_uid)
         if record.is_connected and screen is not None:
@@ -194,17 +194,20 @@ class MonitorManager(QObject):
             record.last_error = message
         self.write_to_console(session_id, message, level)
 
-    @Slot(str)
-    def _on_slm_window_toggle_requested(self, session_id: str) -> None:
+    @Slot(str, bool)
+    def _on_slm_window_enable_requested(self, session_id: str, value: bool) -> None:
         session = self._sessions_by_id.get(session_id)
         if session is None:
             return
-        if session.state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED):
-            session.disable()
-            self.write_to_console(session_id, "SLM window disabled via HERO.")
-        else:
+        is_enabled = session.state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED)
+        if value == is_enabled:
+            return
+        if value:
             session.enable()
             self.write_to_console(session_id, "SLM window enabled via HERO.")
+        else:
+            session.disable()
+            self.write_to_console(session_id, "SLM window disabled via HERO.")
 
     def iter_debug_views(self) -> list[SessionDebugView]:
         views: list[SessionDebugView] = []

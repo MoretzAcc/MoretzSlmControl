@@ -32,9 +32,9 @@ class SlmHeroConnector(LocalHERO):
             return
         self._destroy_hero()
 
-    def toggleSlmWindow(self) -> None:
-        self._log_setter("toggleSlmWindow")
-        self._hologram_manager.toggleSlmWindow()
+    def enableSlmWindow(self, value: bool = True) -> None:
+        self._log_setter("enableSlmWindow")
+        self._hologram_manager.enableSlmWindow(value)
 
     def enableCorrectionPattern(self, value: bool = True, update: bool = True) -> None:
         self._log_setter("enableCorrectionPattern")

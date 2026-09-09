@@ -18,7 +18,7 @@ class DisplayBridge(QObject):
     frameAvailable = Signal(str, int)
     statsChanged = Signal(str)
     consoleMessage = Signal(str, str, str)
-    slmWindowToggleRequested = Signal(str)
+    slmWindowEnableRequested = Signal(str, bool)
 
     def __init__(self, session_id: str, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -37,5 +37,5 @@ class DisplayBridge(QObject):
     def notify_console(self, level: str, message: str) -> None:
         self.consoleMessage.emit(self._session_id, level, message)
 
-    def request_slm_window_toggle(self) -> None:
-        self.slmWindowToggleRequested.emit(self._session_id)
+    def request_slm_window_enable(self, value: bool) -> None:
+        self.slmWindowEnableRequested.emit(self._session_id, value)
