@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -30,7 +31,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QPushButton,
-    QSlider,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -43,6 +43,8 @@ from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
 from moretzslmcontrol.util.patterns.zernike import makePattern, zernike_modes, zernike_order
+from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
+from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
 if TYPE_CHECKING:
     from moretzslmcontrol.monitor_stuff.models import SessionDebugView
@@ -50,26 +52,6 @@ if TYPE_CHECKING:
     from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 
 logger = logging.getLogger(__name__)
-
-crossout_thickness = 0.08
-
-
-def _cross_out_preview(preview_bytes: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Overlay a relative-width X by shifting its pixels through half the dtype range."""
-    height, width = preview_bytes.shape
-    rows = np.linspace(0.0, 1.0, height)[:, np.newaxis]
-    columns = np.linspace(0.0, 1.0, width)[np.newaxis, :]
-    cross_mask = (np.abs(rows - columns) <= crossout_thickness / 2) | (
-        np.abs(rows + columns - 1) <= crossout_thickness / 2
-    )
-    cross_mask_wide = (np.abs(rows - columns) <= crossout_thickness) | (
-            np.abs(rows + columns - 1) <= crossout_thickness
-    )
-    crossed_out = preview_bytes.copy()
-    crossed_out[cross_mask_wide] = np.iinfo(crossed_out.dtype).max - 2
-    crossed_out[cross_mask] = 1
-    return crossed_out
-
 
 class MainWindow(QMainWindow):
     """Presentation-only control surface for the known SLM displays."""
@@ -83,7 +65,7 @@ class MainWindow(QMainWindow):
         self._loaded_pattern_paths: dict[str, dict[str, str]] = {}
         self._pattern_path_fields: dict[str, QLineEdit] = {}
         self._preview_labels: dict[str, QLabel] = {}
-        self._shift_sliders: dict[str, QSlider] = {}
+        self._shift_sliders: dict[str, DeferredWheelSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
         self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
@@ -123,7 +105,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(12, 12, 8, 12)
         sidebar_layout.addWidget(QLabel("Screens"))
         sidebar_layout.addWidget(self._list_widget)
-        sidebar_layout.addWidget(QPushButton("Refresh"))
+        refresh_button = QPushButton("Refresh")
+        refresh_button.clicked.connect(self._monitor_manager.rescan_screens)
+        sidebar_layout.addWidget(refresh_button)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.VLine)
@@ -199,7 +183,7 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:
-        group = QGroupBox("Applied Hologram")
+        group = QGroupBox("Hologram Preview")
         group.setMinimumWidth(280)
         layout = QVBoxLayout(group)
         layout.addWidget(self._build_pattern_component(None, component_key="total"))
@@ -548,7 +532,7 @@ class MainWindow(QMainWindow):
         preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
         preview_bytes = phaseToByte(preview_phase)
         if not active:
-            preview_bytes = _cross_out_preview(preview_bytes)
+            preview_bytes = cross_out_preview(preview_bytes)
         image = QImage(
             preview_bytes.data,
             target_width,
@@ -599,7 +583,7 @@ class MainWindow(QMainWindow):
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(4)
-        slider = QSlider(Qt.Orientation.Horizontal)
+        slider = DeferredWheelSlider(Qt.Orientation.Horizontal)
         slider.setRange(-200, 200)
         value_input = QLineEdit("0")
         value_input.setMaximumWidth(46)
@@ -609,6 +593,9 @@ class MainWindow(QMainWindow):
         self._shift_sliders[axis] = slider
         self._shift_inputs[axis] = value_input
         slider.sliderReleased.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
+        slider.wheelFinished.connect(
+            lambda selected_axis=axis: self._on_shift_slider_released(selected_axis)
+        )
         value_input.editingFinished.connect(
             lambda selected_axis=axis: self._on_shift_input_edited(selected_axis)
         )
@@ -678,9 +665,12 @@ class MainWindow(QMainWindow):
             form.addRow(f"{label}:", field_row)
         return form
 
-    def _build_zernike_parameter_fields(self) -> QFormLayout:
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+    def _build_zernike_parameter_fields(self) -> QGridLayout:
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        row = 0
         for name, (order, _azimuthal_order) in zernike_modes.items():
             if order > zernike_order:
                 continue
@@ -690,8 +680,10 @@ class MainWindow(QMainWindow):
             field.setValidator(QDoubleValidator(field))
             field.editingFinished.connect(self._update_zernike_pattern)
             self._zernike_parameter_fields[name] = field
-            form.addRow(f"{name}:", field)
-        return form
+            grid.addWidget(QLabel(f"{name}:"), row, 0, alignment=Qt.AlignmentFlag.AlignRight)
+            grid.addWidget(field, row, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+            row += 1
+        return grid
 
     def _on_shift_slider_released(self, axis: str) -> None:
         try:
@@ -923,6 +915,8 @@ class MainWindow(QMainWindow):
             return
 
         if screen_uid != self._modification_screen_uid:
+            for slider in self._shift_sliders.values():
+                slider.cancel_pending_wheel_update()
             if self._modification_screen_uid is not None:
                 self._store_modification_inputs(self._modification_screen_uid)
             self._load_modification_inputs(screen_uid)

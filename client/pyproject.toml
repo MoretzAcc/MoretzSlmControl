@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol-client"
-version = "0.3.1"
+version = "0.3.2"
 description = "Python client for controlling Moretz SLM Control instances through HEROS."
 readme = "README.md"
 requires-python = ">=3.11"

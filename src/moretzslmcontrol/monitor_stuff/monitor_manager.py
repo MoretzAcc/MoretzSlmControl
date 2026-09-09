@@ -105,14 +105,7 @@ class MonitorManager(QObject):
             return None
         session = self._sessions_by_id.get(screen_uid)
         if session is None:
-            session = DisplaySession(record, self._platform_adapter)
-            session.bridge.statsChanged.connect(self._on_session_stats_changed)
-            session.bridge.consoleMessage.connect(self._on_session_console_message)
-            self._sessions_by_id[screen_uid] = session
-            if record.is_connected:
-                screen = self._known_screens.get(screen_uid)
-                if screen is not None:
-                    session.attach_screen(screen)
+            session = self._create_session(record)
         session.enable()
         self.recordsChanged.emit()
         return session
@@ -144,14 +137,24 @@ class MonitorManager(QObject):
             return None
         session = self._sessions_by_id.get(screen_uid)
         if session is None:
-            session = DisplaySession(record, self._platform_adapter)
-            session.bridge.statsChanged.connect(self._on_session_stats_changed)
-            session.bridge.consoleMessage.connect(self._on_session_console_message)
-            self._sessions_by_id[screen_uid] = session
-            screen = self._known_screens.get(screen_uid)
-            if record.is_connected and screen is not None:
-                session.attach_screen(screen)
+            session = self._create_session(record)
         return session.displayer
+
+    def _create_session(self, record: ScreenRecord) -> DisplaySession:
+        session = DisplaySession(record, self._platform_adapter)
+        session.bridge.statsChanged.connect(self._on_session_stats_changed)
+        session.bridge.consoleMessage.connect(self._on_session_console_message)
+        session.bridge.slmWindowToggleRequested.connect(self._on_slm_window_toggle_requested)
+        self._sessions_by_id[record.screen_uid] = session
+        screen = self._known_screens.get(record.screen_uid)
+        if record.is_connected and screen is not None:
+            session.attach_screen(screen)
+        self.write_to_console(record.screen_uid, "Session initialized.")
+        self.write_to_console(
+            record.screen_uid,
+            f"HERO initialized and discoverable as '{session.heros_name}'.",
+        )
+        return session
 
     def shutdown(self) -> None:
         """Release all display sessions and their external control resources."""
@@ -190,6 +193,18 @@ class MonitorManager(QObject):
         if record is not None and level == "error":
             record.last_error = message
         self.write_to_console(session_id, message, level)
+
+    @Slot(str)
+    def _on_slm_window_toggle_requested(self, session_id: str) -> None:
+        session = self._sessions_by_id.get(session_id)
+        if session is None:
+            return
+        if session.state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED):
+            session.disable()
+            self.write_to_console(session_id, "SLM window disabled via HERO.")
+        else:
+            session.enable()
+            self.write_to_console(session_id, "SLM window enabled via HERO.")
 
     def iter_debug_views(self) -> list[SessionDebugView]:
         views: list[SessionDebugView] = []
