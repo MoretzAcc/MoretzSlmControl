@@ -34,13 +34,14 @@ uv run python -m unittest discover -s tests
 - Rework design of the enabl / disable window button
 - give console more space / make console height resizable
 - Expand message: "Closing Appliation"
+  - Get more information, make global try finally 
   - Reasons:
     - Keyboard Interrupt
     - Crash
     - Automatic Shutdown
     - Use clicked cross
     - other
-  - Add a timestamp
+    - Add a timestamp
 - button to reset session into null state
   - with popup to confirm
 - Connection via Heros toggleable
@@ -56,6 +57,21 @@ uv run python -m unittest discover -s tests
 
 ### TODO Future Ideas
 
+- Allow saving a session (for one SLM display)
+  - Save current state to json
+    - save all holograms
+    - save settings
+    - save header
+      - json meta data
+        - program version (= json version)
+        - when saved
+      - screen metadata
+        - resolution for verification
+        - other info jsut for information
+  - Load session from json 
+    - respect defaults if value is not included
+    - throw warning if version is not identical
+    - throw error if resolution does not match
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
 
