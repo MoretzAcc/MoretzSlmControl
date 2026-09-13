@@ -11,9 +11,7 @@ uv run python -m unittest discover -s tests
 
 ### TODO Bugs / Issues
 
-- Toggle SLM window should have true false argument
 - when slm window is enabled it gains focus (at least on linux) i dont want that
-
 - Windows Aero Peek, one idea to fix is in anti_aero_peak.py
 - Control Window may be hidden behind slm display windows -> stupid people can hardlock themselves
     - This can happen through activation of the display over the control software
@@ -22,12 +20,30 @@ uv run python -m unittest discover -s tests
     - This can happen via moving the control window to a different monitor
         - solution: detect movement. After movement if on a monitor with active display, teleport back onto primary monitor / monitor with no active display
         - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
-
+    - Fix: When pressing SLM Window Enable Button check if associated monitors contains mouse.getMonitor. 
+      - If yes, make a popup and ask for confirmation (add a comment that this popup appeared because mouse click / manual open, it would not appear when using heros)
+- freeze on screen startup. Should have a loading wheel or at least a log that it has begun loading and a couple steps... Example:
+  - "0/3 Initiated Startup"
+  - "1/3 Prepared Previews"
+  - "2/3 Opened SLM Window"
+  - "3/3 Initiated Heros"
 
 ### TODO Tasks
 
-- Sending a pattern via heros should enable the screen by default (should it?)
+- Make timestamp include date and not just time
+- Rework design of the enabl / disable window button
+- give console more space / make console height resizable
+- Expand message: "Closing Appliation"
+  - Get more information, make global try finally 
+  - Reasons:
+    - Keyboard Interrupt
+    - Crash
+    - Automatic Shutdown
+    - Use clicked cross
+    - other
+    - Add a timestamp
 - button to reset session into null state
+  - with popup to confirm
 - Connection via Heros toggleable
 - speed up program
     - speed up the modification pattern generation
@@ -41,6 +57,21 @@ uv run python -m unittest discover -s tests
 
 ### TODO Future Ideas
 
+- Allow saving a session (for one SLM display)
+  - Save current state to json
+    - save all holograms
+    - save settings
+    - save header
+      - json meta data
+        - program version (= json version)
+        - when saved
+      - screen metadata
+        - resolution for verification
+        - other info jsut for information
+  - Load session from json 
+    - respect defaults if value is not included
+    - throw warning if version is not identical
+    - throw error if resolution does not match
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
 
@@ -48,6 +79,7 @@ uv run python -m unittest discover -s tests
 
 - Examples
 - Monitor UID, Herosname should be the same for a given combination of pc + monitor + used port
+- Explain why Screen and Monitor are different and have a manyto one relation
 
 ### Known Issues - Won't Fix
 
