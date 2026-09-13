@@ -175,7 +175,7 @@ class MonitorManager(QObject):
         display_name = record.display_name if record is not None else screen_uid
         log_method("[%s] %s", display_name, message)
         entries = self._console_entries_by_id.setdefault(screen_uid, deque(maxlen=500))
-        timestamp = datetime.now().astimezone().strftime("%H:%M:%S")
+        timestamp = datetime.now().astimezone().strftime("%Y/%m/%d %H:%M:%S")
         entries.append((timestamp, level, message))
         self.consoleChanged.emit(screen_uid)
 
