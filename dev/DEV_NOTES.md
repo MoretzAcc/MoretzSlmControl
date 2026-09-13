@@ -30,7 +30,6 @@ uv run python -m unittest discover -s tests
 
 ### TODO Tasks
 
-- Make timestamp include date and not just time
 - Rework design of the enabl / disable window button
 - give console more space / make console height resizable
 - Expand message: "Closing Appliation"
