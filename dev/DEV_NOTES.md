@@ -60,6 +60,7 @@ uv run python -m unittest discover -s tests
     - throw error if resolution does not match
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
+- README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong
 
 ### TODO put into README
 

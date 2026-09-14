@@ -10,6 +10,8 @@ Version Bump: 0.3.3
 ##### Added:
 - Changing Zernike Coefficients is now accessible via Heros
 - CHANGELOG.md
+- Added host_id into UID generation
+- Added monitor serial numbers into UID generation
 
 ##### Changed:
 - Added Date to console timestamp

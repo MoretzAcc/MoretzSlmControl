@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QScreen
@@ -24,6 +25,20 @@ logger = logging.getLogger(__name__)
 
 
 class LinuxPlatformAdapter(PlatformAdapter):
+    def get_host_id(self) -> str:
+        try:
+            machine_id = Path("/etc/machine-id")
+            if machine_id.exists():
+                return machine_id.read_text().strip()
+            else:
+                return ""
+        except PermissionError:
+            logger.debug("Failed to get host id (PermissionError).")
+            return ""
+        except OSError as _:
+            logger.debug("Failed to get host id (OSError).")
+            return ""
+
     def __init__(self, qt_backend: str) -> None:
         self.qt_backend = qt_backend
         self.desktop_environment = os.environ.get("XDG_CURRENT_DESKTOP")

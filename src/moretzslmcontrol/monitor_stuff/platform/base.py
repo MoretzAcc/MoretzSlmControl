@@ -29,6 +29,11 @@ class MonitorEdid:
 
 
 class PlatformAdapter(ABC):
+
+    @abstractmethod
+    def get_host_id(self) -> str:
+        pass
+
     @abstractmethod
     def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
         pass
@@ -46,9 +51,11 @@ class PlatformAdapter(ABC):
         )
         uid_source = "_".join(
             (
+                self.get_host_id(),
                 display_name,
                 *(edid.os_identifier for edid in edids),
                 *(f"{edid.parsed_edid.year}/{edid.parsed_edid.week}" for edid in edids),
+                *(f"{edid.parsed_edid.serial}" for edid in edids),
             )
         )
         screen_uid = sha256(uid_source.encode("utf-8")).hexdigest()[:8]
