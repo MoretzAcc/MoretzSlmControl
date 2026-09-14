@@ -5,6 +5,7 @@ Generated using ChatGPT
 """
 
 from __future__ import annotations
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from moretzslmcontrol.hologram_manager import HologramManager
@@ -20,7 +21,12 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 
 
 class DisplaySession:
-    def __init__(self, screen_record: ScreenRecord, platform_adapter: PlatformAdapter) -> None:
+    def __init__(
+        self,
+        screen_record: ScreenRecord,
+        platform_adapter: PlatformAdapter,
+        report_progress: Callable[[str], None],
+    ) -> None:
         self.screen_record = screen_record
         self.session_id = screen_record.screen_uid
         self.heros_name = f"slm_{screen_record.screen_uid}__{screen_record.display_name.replace(' - ', '_').replace('-', '_').strip()}"
@@ -31,7 +37,10 @@ class DisplaySession:
             W=screen_record.width,
             herosName=self.heros_name,
             bridge=self.bridge,
+            report_progress=report_progress,
         )
+        self._report_progress = report_progress
+        self._report_progress("Creating Output Window")
         self.window = DisplayWindow(
             session_id=self.session_id,
             displayer=self.displayer,
@@ -69,6 +78,7 @@ class DisplaySession:
         else:
             self.window.detach_from_screen()
         self.bridge.notify_stats_changed()
+        self._report_progress("SLM Screen Ready")
 
     def disable(self) -> None:
         self._enabled = False

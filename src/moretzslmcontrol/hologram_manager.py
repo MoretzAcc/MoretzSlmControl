@@ -6,7 +6,7 @@ Date: 23.03.2026
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 
@@ -38,13 +38,21 @@ class PatternSizeMismatchError(Exception):
 
 
 class HologramManager:
-    def __init__(self, H: int, W: int, herosName: str, bridge: DisplayBridge) -> None:
+    def __init__(
+        self,
+        H: int,
+        W: int,
+        herosName: str,
+        bridge: DisplayBridge,
+        report_progress: Callable[[str], None],
+    ) -> None:
         logger.info(f"Initializing SLM DisplayerV2 with resolution: {W}x{H}")
         self.herosName = herosName
         self.shape = (H, W)
         self._bridge = bridge
         self._lock = threading.Lock()
 
+        report_progress("Allocating Display Buffers")
         self._correctionPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
         self._hologramPattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
         self._zernikePattern: NDArray[np.float32] = np.zeros(self.shape, dtype=np.float32)
@@ -71,6 +79,7 @@ class HologramManager:
         self._latestFrame: NDArray[np.uint8] = np.full(self.shape, half_dtype_range, dtype=np.uint8)
         self._latestRevision: int = 0
         self._stats = SessionStats()
+        report_progress("Registering HERO")
         self.heroConnector = SlmHeroConnector(self, self.herosName) # TODO make this toggleable somehow
 
     def enableSlmWindow(self, value: bool = True) -> None:

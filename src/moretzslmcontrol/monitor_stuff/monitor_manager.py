@@ -105,6 +105,7 @@ class MonitorManager(QObject):
             return None
         session = self._sessions_by_id.get(screen_uid)
         if session is None:
+            self.write_to_console(screen_uid, "Starting SLM Screen")
             session = self._create_session(record)
         session.enable()
         self.recordsChanged.emit()
@@ -141,7 +142,10 @@ class MonitorManager(QObject):
         return session.displayer
 
     def _create_session(self, record: ScreenRecord) -> DisplaySession:
-        session = DisplaySession(record, self._platform_adapter)
+        def report_progress(message: str) -> None:
+            self.write_to_console(record.screen_uid, message)
+
+        session = DisplaySession(record, self._platform_adapter, report_progress)
         session.bridge.statsChanged.connect(self._on_session_stats_changed)
         session.bridge.consoleMessage.connect(self._on_session_console_message)
         session.bridge.slmWindowEnableRequested.connect(self._on_slm_window_enable_requested)
@@ -149,11 +153,6 @@ class MonitorManager(QObject):
         screen = self._known_screens.get(record.screen_uid)
         if record.is_connected and screen is not None:
             session.attach_screen(screen)
-        self.write_to_console(record.screen_uid, "Session initialized.")
-        self.write_to_console(
-            record.screen_uid,
-            f"HERO initialized and discoverable as '{session.heros_name}'.",
-        )
         return session
 
     def shutdown(self) -> None:

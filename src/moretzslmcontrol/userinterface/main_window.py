@@ -6,6 +6,7 @@ Date: 23.03.2026
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from math import floor, log10
 from html import escape
 from pathlib import Path
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QPushButton,
+    QSplitter,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -58,9 +60,14 @@ class MainWindow(QMainWindow):
 
     _MAX_ASSOCIATED_MONITORS = 3
 
-    def __init__(self, monitor_manager: MonitorManager) -> None:
+    def __init__(
+        self,
+        monitor_manager: MonitorManager,
+        on_close_requested: Callable[[], None] | None = None,
+    ) -> None:
         super().__init__()
         self._monitor_manager = monitor_manager
+        self._on_close_requested = on_close_requested
         self._loaded_patterns: dict[str, dict[str, NDArray[np.float32]]] = {}
         self._loaded_pattern_paths: dict[str, dict[str, str]] = {}
         self._pattern_path_fields: dict[str, QLineEdit] = {}
@@ -140,7 +147,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
-        logger.info("Closing application")
+        if self._on_close_requested is not None:
+            self._on_close_requested()
         self._monitor_manager.shutdown()
         event.accept()
         QApplication.quit()
@@ -178,8 +186,14 @@ class MainWindow(QMainWindow):
         information_row.addWidget(self._build_monitor_information_group(), 1)
         information_row.addWidget(self._build_applied_hologram_group())
         page_layout.addLayout(information_row)
-        page_layout.addWidget(self._build_pattern_group(), 2)
-        page_layout.addWidget(self._build_console_group())
+        lower_splitter = QSplitter(Qt.Orientation.Vertical)
+        lower_splitter.setChildrenCollapsible(False)
+        lower_splitter.addWidget(self._build_pattern_group())
+        lower_splitter.addWidget(self._build_console_group())
+        lower_splitter.setStretchFactor(0, 1)
+        lower_splitter.setStretchFactor(1, 0)
+        lower_splitter.setSizes([800, 110])
+        page_layout.addWidget(lower_splitter, 2)
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:
@@ -897,7 +911,7 @@ class MainWindow(QMainWindow):
         self._console = QTextEdit()
         self._console.setReadOnly(True)
         self._console.setPlaceholderText("Nothing to show yet.")
-        self._console.setFixedHeight(78)
+        self._console.setMinimumHeight(78)
         layout.addWidget(self._console)
         return group
 
