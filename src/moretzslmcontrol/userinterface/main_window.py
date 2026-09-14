@@ -42,7 +42,7 @@ from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
-from moretzslmcontrol.util.patterns.zernike import makePattern, zernike_modes, zernike_order
+from moretzslmcontrol.util.patterns.zernike import zernike_modes, zernike_order
 from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
@@ -819,8 +819,7 @@ class MainWindow(QMainWindow):
             self._write_console("Error: selected screen is no longer available")
             return
         try:
-            pattern = makePattern(displayer.getZernikeCartGrid(), aberrations)
-            displayer.setZernikePattern(np.asarray(pattern, dtype=np.float32))
+            displayer.setZernikeAberrations(aberrations)
         except PatternSizeMismatchError:
             return
         except Exception as error:

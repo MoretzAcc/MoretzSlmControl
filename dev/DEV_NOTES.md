@@ -30,7 +30,7 @@ uv run python -m unittest discover -s tests
 
 ### TODO Tasks
 
-- Rework design of the enabl / disable window button
+- Rework design of the enable / disable window button
 - give console more space / make console height resizable
 - Expand message: "Closing Appliation"
   - Get more information, make global try finally 
@@ -52,7 +52,9 @@ uv run python -m unittest discover -s tests
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks
 - Show bitdepth in the UI
-    - Detect if SLM bitdepth is > 8, and warn the user.
+    - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
+- Replace crossout by text "DIsabled" or "Off"
+  - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
 
@@ -87,6 +89,16 @@ uv run python -m unittest discover -s tests
 - Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
 
 # Changelog
+
+### 26-09-14 
+
+Version Bump: 0.3.3
+
+##### Added:
+- Changing Zernike Coefficients is now accessible via Heros
+
+##### Changed:
+- Added Date to console timestamp
 
 ### 26-09-09
 

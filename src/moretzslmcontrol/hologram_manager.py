@@ -6,6 +6,7 @@ Date: 23.03.2026
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 
@@ -21,7 +22,7 @@ from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.math_util import wrap_phase
-from moretzslmcontrol.util.patterns.zernike import makeCartGrid
+from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 
 
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
@@ -55,6 +56,9 @@ class HologramManager:
         self._includeZernikePattern: bool = True
         self._includeModificationPattern: bool = True
         self._zernike_cart_grid: RZern | None = None
+        self._zernike_aberrations: dict[str, float] = {
+            name: 0.0 for name, (order, _azimuthal_order) in zernike_modes.items() if order <= zernike_order
+        }
 
         self._flipCorrectionPatternHorizontally: bool = False
         self._flipHologramPatternHorizontally: bool = False
@@ -171,6 +175,38 @@ class HologramManager:
                 flip_horizontally=False,
                 flip_vertically=False,
             )
+            self._includeZernikePattern = True
+        if update:
+            self.publishCurrentPattern()
+
+    def setZernikeAberrations(self, aberrations: Mapping[str, float], update: bool = True) -> None:
+        """Set named Zernike coefficients and regenerate the Zernike pattern.
+
+        This is intentionally an internal application API rather than a generic
+        HERO endpoint. Remote callers use one explicit setter per supported mode.
+        """
+        normalized_aberrations: dict[str, float] = {}
+        for name, value in aberrations.items():
+            if name not in zernike_modes:
+                raise ValueError(f"Unknown Zernike mode: {name}")
+            order, _azimuthal_order = zernike_modes[name]
+            if order > zernike_order:
+                raise ValueError(
+                    f"Zernike mode '{name}' requires order {order}, but this SLM supports order {zernike_order}"
+                )
+            coefficient = float(value)
+            if not np.isfinite(coefficient):
+                raise ValueError(f"Zernike coefficient for '{name}' must be finite")
+            normalized_aberrations[name] = coefficient
+
+        with self._lock:
+            if self._zernike_cart_grid is None:
+                height, width = self.shape
+                self._zernike_cart_grid = makeCartGrid(Nx=width, Ny=height, dx=1.0, dy=1.0)
+            updated_aberrations = {**self._zernike_aberrations, **normalized_aberrations}
+            pattern = makePattern(self._zernike_cart_grid, updated_aberrations)
+            self._zernike_aberrations = updated_aberrations
+            self._zernikePattern = wrap_phase(np.asarray(pattern, dtype=np.float32))
             self._includeZernikePattern = True
         if update:
             self.publishCurrentPattern()

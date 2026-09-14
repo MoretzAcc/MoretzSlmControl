@@ -98,7 +98,41 @@ class SlmHeroConnector(LocalHERO):
         self._log_setter("setZernikePattern")
         self._hologram_manager.setZernikePattern(phaseArr, update)
 
-    def _log_setter(self, method_name: str, value: bool | None = None) -> None:
+    def setZernikeDefocus(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeDefocus", "defocus", value, update)
+
+    def setZernikeAstigmatism0(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeAstigmatism0", "asti 0", value, update)
+
+    def setZernikeAstigmatism45(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeAstigmatism45", "asti 45", value, update)
+
+    def setZernikeComa0(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeComa0", "coma 0", value, update)
+
+    def setZernikeComa90(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeComa90", "coma 90", value, update)
+
+    def setZernikePrimarySpherical(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikePrimarySpherical", "primary spherical", value, update)
+
+    def setZernikeTrefoil0(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeTrefoil0", "trefoil 0", value, update)
+
+    def setZernikeTrefoil90(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeTrefoil90", "trefoil 90", value, update)
+
+    def setZernikeSecondaryAstigmatism0(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeSecondaryAstigmatism0", "asti 2nd 0", value, update)
+
+    def setZernikeSecondaryAstigmatism45(self, value: float, update: bool = True) -> None:
+        self._set_zernike_aberration("setZernikeSecondaryAstigmatism45", "asti 2nd 45", value, update)
+
+    def _set_zernike_aberration(self, method_name: str, mode: str, value: float, update: bool) -> None:
+        self._log_setter(method_name, value)
+        self._hologram_manager.setZernikeAberrations({mode: value}, update)
+
+    def _log_setter(self, method_name: str, value: bool | float | None = None) -> None:
         value_text = "" if value is None else f" with value={value}"
         self._hologram_manager.write_to_console(f"Heros: {method_name} requested{value_text}.")
 
