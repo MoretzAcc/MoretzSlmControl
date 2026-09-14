@@ -36,6 +36,7 @@ class DisplaySession:
             H=screen_record.height,
             W=screen_record.width,
             herosName=self.heros_name,
+            display_name=screen_record.display_name,
             bridge=self.bridge,
             report_progress=report_progress,
         )

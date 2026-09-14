@@ -21,10 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 class SlmHeroConnector(LocalHERO):
-    def __init__(self, hologram_manager: HologramManager, heros_name: str, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        hologram_manager: HologramManager,
+        heros_name: str,
+        display_name: str,
+        *args,
+        **kwargs,
+    ) -> None:
         super().__init__(heros_name, *args, **kwargs)
         self._hologram_manager = hologram_manager
-        logger.info(f"SLM is available as a Hero with name: {heros_name}")
+        logger.info("[%s] SLM is available as a Hero with name: %s", display_name, heros_name)
 
     def close(self) -> None:
         """Release the HERO queryables and its Zenoh session reference."""

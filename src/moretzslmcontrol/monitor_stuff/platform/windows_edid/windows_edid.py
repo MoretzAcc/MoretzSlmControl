@@ -56,16 +56,18 @@ def windows_match_edids(screen: QScreen) -> list[WindowsMonitor]:
             )
         ]
 
-        print("QScreen:", screen.name())
-        print("GDI:", target.gdi_device_name)
-        print("Device path:", target.monitor_device_path)
-
-        if len(edid_matches) == 1:
-            print("EDID:", edid_matches[0].parsed_edid)
-        elif not edid_matches:
-            print("Kein passender EDID-Eintrag")
-        else:
-            print("Mehrere passende EDID-Einträge")
+        if not edid_matches:
+            logger.warning(
+                "%s: No matching EDID entry for GDI device %s",
+                screen.name(),
+                target.gdi_device_name,
+            )
+        elif len(edid_matches) > 1:
+            logger.warning(
+                "%s: Multiple matching EDID entries for GDI device %s",
+                screen.name(),
+                target.gdi_device_name,
+            )
 
         global_matches.extend(edid_matches)
 

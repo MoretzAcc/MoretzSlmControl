@@ -26,7 +26,6 @@ uv run python -m unittest discover -s tests
 ### TODO Tasks
 
 - Rework design of the enable / disable window button
-- give console more space / make console height resizable
 - button to reset session into null state
   - with popup to confirm
 - Connection via Heros toggleable

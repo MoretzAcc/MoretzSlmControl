@@ -43,10 +43,11 @@ class HologramManager:
         H: int,
         W: int,
         herosName: str,
+        display_name: str,
         bridge: DisplayBridge,
         report_progress: Callable[[str], None],
     ) -> None:
-        logger.info(f"Initializing SLM DisplayerV2 with resolution: {W}x{H}")
+        logger.info("[%s] Initializing SLM DisplayerV2 with resolution: %sx%s", display_name, W, H)
         self.herosName = herosName
         self.shape = (H, W)
         self._bridge = bridge
@@ -80,7 +81,7 @@ class HologramManager:
         self._latestRevision: int = 0
         self._stats = SessionStats()
         report_progress("Registering HERO")
-        self.heroConnector = SlmHeroConnector(self, self.herosName) # TODO make this toggleable somehow
+        self.heroConnector = SlmHeroConnector(self, self.herosName, display_name) # TODO make this toggleable somehow
 
     def enableSlmWindow(self, value: bool = True) -> None:
         """Request an explicit SLM output-window state on the GUI thread."""

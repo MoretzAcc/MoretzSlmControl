@@ -4,6 +4,8 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 
+# TODO has to be tested
+
 DWMWA_EXCLUDED_FROM_PEEK = 12
 
 
