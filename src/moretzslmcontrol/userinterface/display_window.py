@@ -24,8 +24,8 @@ class DisplayWindow(QWidget):
     closed = Signal()
     closeRequested = Signal()
 
-    _EXIT_ACTIVATION_CLICK_COUNT = 3
-    _EXIT_ACTIVATION_WINDOW_MS = 1_200
+    _EXIT_ACTIVATION_CLICK_COUNT = 2
+    _EXIT_ACTIVATION_WINDOW_MS = 800
     _CLOSE_CONTROL_TIMEOUT_MS = 5_000
     _CLOSE_CONTROL_SIZE_RATIO = 0.05
 
