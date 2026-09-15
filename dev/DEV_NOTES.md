@@ -22,10 +22,11 @@ uv run python -m unittest discover -s tests
         - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
     - Fix: When pressing SLM Window Enable Button check if associated monitors contains mouse.getMonitor. 
       - If yes, make a popup and ask for confirmation (add a comment that this popup appeared because mouse click / manual open, it would not appear when using heros)
+  - Fix: Left / Right click onto window will open a small help to disable the screen
 
 ### TODO Tasks
 
-- Rework design of the enable / disable window button
+- ! Rework design of the enable / disable window button
 - button to reset session into null state
   - with popup to confirm
 - Connection via Heros toggleable
@@ -36,9 +37,9 @@ uv run python -m unittest discover -s tests
 - remove duplicate code from client and server
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks
-- Show bitdepth in the UI
+- ! Show bitdepth in the UI
     - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
-- Replace crossout by text "DIsabled" or "Off"
+- ! Replace crossout by text "DIsabled" or "Off"
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas

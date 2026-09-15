@@ -44,10 +44,12 @@ class DisplaySession:
         self._report_progress("Creating Output Window")
         self.window = DisplayWindow(
             session_id=self.session_id,
+            display_name=screen_record.display_name,
             displayer=self.displayer,
             platform_adapter=self.platform_adapter,
         )
         self.bridge.frameAvailable.connect(self.window.on_frame_available)
+        self.window.closeRequested.connect(self.disable)
         self.window.closed.connect(self._on_window_closed)
         self._enabled = False
         self._attached_screen: QScreen | None = None

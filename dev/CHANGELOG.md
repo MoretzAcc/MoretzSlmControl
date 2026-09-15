@@ -3,6 +3,19 @@
 
 ---
 
+
+### 26-09-15
+
+Version Bump: 0.3.3.post3
+
+##### Added
+- If you click a window multiple times, a small cross appears in the top right corner, to close the window
+  - This was added in case one accidentally opens a window on the primary screen
+
+##### Changed
+- Window name is now "{Display Name} - {Screen UID}"
+
+
 ### 26-09-14
 
 Version Bump: 0.3.3
