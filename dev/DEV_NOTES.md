@@ -13,16 +13,6 @@ uv run python -m unittest discover -s tests
 
 - when slm window is enabled it gains focus (at least on linux) i dont want that
 - Windows Aero Peek, one idea to fix is in anti_aero_peak.py
-- Control Window may be hidden behind slm display windows -> stupid people can hardlock themselves
-    - This can happen through activation of the display over the control software
-        - solution 1: prevent activation of display on primary monitor
-        - solution 2: prevent activation of display on the monitor where the mouse is currently located
-    - This can happen via moving the control window to a different monitor
-        - solution: detect movement. After movement if on a monitor with active display, teleport back onto primary monitor / monitor with no active display
-        - solution: detect movement. After movement if on a monitor with active display, disable the display on that monitor
-    - Fix: When pressing SLM Window Enable Button check if associated monitors contains mouse.getMonitor. 
-      - If yes, make a popup and ask for confirmation (add a comment that this popup appeared because mouse click / manual open, it would not appear when using heros)
-  - Fix: Left / Right click onto window will open a small help to disable the screen
 
 ### TODO Tasks
 
