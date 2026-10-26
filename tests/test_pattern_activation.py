@@ -63,6 +63,21 @@ class PatternActivationTest(unittest.TestCase):
 
         self.assertEqual(self.manager._zernike_aberrations["primary spherical"], 0.0)
 
+    def test_exported_patterns_undo_current_flip_settings(self) -> None:
+        correction = np.arange(12, dtype=np.float32).reshape(3, 4)
+        hologram = correction + 20
+        self.manager._flipCorrectionPatternHorizontally = True
+        self.manager._flipCorrectionPatternVertically = False
+        self.manager._flipHologramPatternHorizontally = False
+        self.manager._flipHologramPatternVertically = True
+        self.manager._correctionPattern = HologramManager._flip_imported_pattern(correction, True, False)
+        self.manager._hologramPattern = HologramManager._flip_imported_pattern(hologram, False, True)
+
+        exported_correction, exported_hologram = self.manager.getUnflippedImportedPatternSnapshots()
+
+        np.testing.assert_array_equal(exported_correction, correction)
+        np.testing.assert_array_equal(exported_hologram, hologram)
+
 
 if __name__ == "__main__":
     unittest.main()

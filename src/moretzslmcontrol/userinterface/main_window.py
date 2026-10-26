@@ -6,16 +6,19 @@ Date: 23.03.2026
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from math import floor, log10
 from html import escape
 from pathlib import Path
 from threading import Thread
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -31,6 +34,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QStackedWidget,
@@ -43,15 +47,26 @@ from moretzslmcontrol.monitor_stuff.models import SessionState
 from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
+from moretzslmcontrol.util.config_file import (
+    FORMAT_NAME,
+    FORMAT_VERSION,
+    decode_pattern,
+    encode_pattern,
+    load_configuration,
+    save_configuration,
+)
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
-from moretzslmcontrol.util.patterns.zernike import zernike_modes, zernike_order
+from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
 if TYPE_CHECKING:
+    from moretzslmcontrol.hologram_manager import HologramManager
+    from moretzslmcontrol.monitor_stuff.models import ScreenRecord
     from moretzslmcontrol.monitor_stuff.models import SessionDebugView
     from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
     from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
+    from zernike import RZern
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +74,7 @@ class MainWindow(QMainWindow):
     """Presentation-only control surface for the known SLM displays."""
 
     _MAX_ASSOCIATED_MONITORS = 3
+    patternCalculationFinished = Signal(str, str, int, object)
 
     def __init__(
         self,
@@ -86,9 +102,14 @@ class MainWindow(QMainWindow):
         self._last_zernike_parameters: dict[str, tuple[float, ...]] = {}
         self._pattern_active_checks: dict[str, QCheckBox] = {}
         self._pattern_flip_checks: dict[tuple[str, str], QCheckBox] = {}
+        self._calculation_status_labels: dict[str, QLabel] = {}
+        self._pattern_calculation_revisions: dict[tuple[str, str], int] = {}
+        self._pending_pattern_calculations: set[tuple[str, str]] = set()
+        self._pattern_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pattern-calculation")
         self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
         self._monitor_manager.consoleChanged.connect(self._on_console_changed)
+        self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")
         self.resize(1550, 880)
@@ -147,6 +168,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
+        self._pattern_executor.shutdown(wait=False, cancel_futures=True)
         if self._on_close_requested is not None:
             self._on_close_requested()
         self._monitor_manager.shutdown()
@@ -176,6 +198,12 @@ class MainWindow(QMainWindow):
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
+        export_button = QPushButton("Export configuration…")
+        export_button.clicked.connect(self._export_configuration)
+        title_row.addWidget(export_button)
+        import_button = QPushButton("Import configuration…")
+        import_button.clicked.connect(self._import_configuration)
+        title_row.addWidget(import_button)
         page_layout.addLayout(title_row)
 
         information_row = QHBoxLayout()
@@ -373,6 +401,14 @@ class MainWindow(QMainWindow):
         if has_zernike_fields:
             layout.addLayout(self._build_zernike_parameter_fields())
 
+        if component_key in ("zernike", "modification"):
+            calculation_status = QLabel("Calculating…")
+            calculation_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            calculation_status.setStyleSheet("color: #ef6c00; font-style: italic;")
+            calculation_status.hide()
+            self._calculation_status_labels[component_key] = calculation_status
+            layout.addWidget(calculation_status)
+
         layout.addStretch()
         return component
 
@@ -424,6 +460,269 @@ class MainWindow(QMainWindow):
         path_field.setText(Path(file_path).name)
         path_field.setToolTip(file_path)
         self._upload_pattern(component_key, component_name, pattern, screen_uid)
+
+    def _export_configuration(self) -> None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
+            self._write_console("Error: select a screen before exporting a configuration")
+            return
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
+        record = self._monitor_manager.get_screen_record(screen_uid)
+        if displayer is None or record is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export SLM configuration",
+            f"{record.display_name or 'slm'}-configuration.json",
+            "SLM configuration (*.json)",
+        )
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".json"):
+            file_path = f"{file_path}.json"
+
+        self._store_modification_inputs(screen_uid)
+        self._store_zernike_inputs(screen_uid)
+        correction, hologram = displayer.getUnflippedImportedPatternSnapshots()
+        try:
+            save_configuration(file_path, self._configuration_snapshot(record, displayer, correction, hologram))
+        except OSError as error:
+            self._write_console(f"Error exporting configuration: {error}")
+            return
+        self._write_console(f"Configuration exported to {Path(file_path).name}.")
+
+    def _configuration_snapshot(
+        self,
+        record: ScreenRecord,
+        displayer: HologramManager,
+        correction: NDArray[np.float32],
+        hologram: NDArray[np.float32],
+    ) -> dict[str, object]:
+        flip_states = displayer.getPatternFlipStates()
+        return {
+            "format": FORMAT_NAME,
+            "format_version": FORMAT_VERSION,
+            "exported_at": datetime.now(UTC).isoformat(),
+            "application_version": self._application_version(),
+            "slm": {
+                "width": record.width,
+                "height": record.height,
+                "display_name": record.display_name,
+                "screen_uid": record.screen_uid,
+                "serial_number": record.serial_number,
+                "screen_name": record.screen_name,
+                "manufacturer": record.manufacturer,
+                "model": record.model,
+                "port_name": record.port_name,
+                "refresh_rate": record.refresh_rate,
+                "physical_size_mm": [record.physical_size_x, record.physical_size_y],
+            },
+            "controls": {
+                "pattern_inclusion": displayer.getPatternInclusion(),
+                "flips": self._flip_state_mapping(flip_states),
+                "modification": self._modification_inputs_by_screen[record.screen_uid],
+                "zernike": self._zernike_inputs_by_screen[record.screen_uid],
+            },
+            "patterns": {
+                "correction": encode_pattern(correction),
+                "hologram": encode_pattern(hologram),
+            },
+        }
+
+    def _import_configuration(self) -> None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None:
+            self._write_console("Error: select a screen before importing a configuration")
+            return
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
+        if displayer is None:
+            self._write_console("Error: selected screen is no longer available")
+            return
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import SLM configuration",
+            "",
+            "SLM configuration (*.json)",
+        )
+        if not file_path:
+            return
+        try:
+            configuration = load_configuration(file_path)
+            source_width, source_height = self._configuration_resolution(configuration)
+            source_controls = self._configuration_controls(configuration)
+        except ValueError as error:
+            self._write_console(f"Error importing configuration: {error}")
+            return
+
+        target_height, target_width = displayer.shape
+        import_patterns = (source_width, source_height) == (target_width, target_height)
+        if not import_patterns:
+            response = QMessageBox.question(
+                self,
+                "SLM resolution differs",
+                (
+                    f"This configuration was exported for {source_width}x{source_height}, but the selected SLM is "
+                    f"{target_width}x{target_height}.\n\n"
+                    "Apply settings only? Correction and hologram patterns will not be imported."
+                ),
+                QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if response != QMessageBox.StandardButton.Yes:
+                return
+
+        try:
+            self._apply_configuration(
+                screen_uid,
+                displayer,
+                configuration,
+                source_controls,
+                import_patterns=import_patterns,
+                source_path=file_path,
+            )
+        except (ValueError, PatternSizeMismatchError) as error:
+            self._write_console(f"Error importing configuration: {error}")
+            return
+        result = "Configuration imported." if import_patterns else "Configuration settings imported without patterns."
+        self._write_console(result)
+
+    def _apply_configuration(
+        self,
+        screen_uid: str,
+        displayer: HologramManager,
+        configuration: Mapping[str, Any],
+        controls: Mapping[str, Any],
+        *,
+        import_patterns: bool,
+        source_path: str,
+    ) -> None:
+        modification_inputs = self._configuration_text_inputs(
+            controls["modification"], self._default_modification_inputs, "modification"
+        )
+        zernike_inputs = self._configuration_text_inputs(controls["zernike"], self._default_zernike_inputs, "zernike")
+        inclusion = self._configuration_bool_mapping(
+            controls["pattern_inclusion"], ("base", "hologram", "zernike", "modification"), "pattern inclusion"
+        )
+        flips = self._configuration_flip_mapping(controls["flips"])
+
+        correction: NDArray[np.float32] | None = None
+        hologram: NDArray[np.float32] | None = None
+        if import_patterns:
+            patterns = self._require_mapping(configuration["patterns"], "patterns")
+            correction = decode_pattern(patterns.get("correction"))
+            hologram = decode_pattern(patterns.get("hologram"))
+            expected_shape = displayer.shape
+            if correction.shape != expected_shape or hologram.shape != expected_shape:
+                raise ValueError("Configuration pattern dimensions do not match the selected SLM")
+
+        self._modification_inputs_by_screen[screen_uid] = modification_inputs
+        self._zernike_inputs_by_screen[screen_uid] = zernike_inputs
+        self._load_modification_inputs(screen_uid)
+        self._load_zernike_inputs(screen_uid)
+        self._last_modification_parameters.pop(screen_uid, None)
+        self._last_zernike_parameters.pop(screen_uid, None)
+        self._update_modification_pattern()
+        self._update_zernike_pattern()
+
+        if import_patterns and correction is not None and hologram is not None:
+            self._set_file_pattern_flips(displayer, {"base": (False, False), "hologram": (False, False)})
+            displayer.setCorrectionPattern(correction, update=False)
+            displayer.setHologramPattern(hologram, update=False)
+            self._loaded_patterns[screen_uid] = {"base": correction, "hologram": hologram}
+            self._loaded_pattern_paths[screen_uid] = {"base": source_path, "hologram": source_path}
+
+        self._set_file_pattern_flips(
+            displayer,
+            {"base": flips["base"], "hologram": flips["hologram"]},
+        )
+        displayer.setFlipModificationPatternHorizontally(flips["modification"][0], update=False)
+        displayer.setFlipModificationPatternVertically(flips["modification"][1], update=False)
+        displayer.enableCorrectionPattern(inclusion["base"], update=False)
+        displayer.enableHologramPattern(inclusion["hologram"], update=False)
+        displayer.enableZernikePattern(inclusion["zernike"], update=False)
+        displayer.enableModificationPattern(inclusion["modification"], update=False)
+        displayer.publishCurrentPattern()
+        self._sync_pattern_active_checks(screen_uid)
+        self._sync_pattern_flip_checks(screen_uid)
+        self.updatePreview()
+
+    @staticmethod
+    def _application_version() -> str:
+        try:
+            return version("moretzslmcontrol")
+        except PackageNotFoundError:
+            return "unknown"
+
+    @staticmethod
+    def _configuration_resolution(configuration: Mapping[str, Any]) -> tuple[int, int]:
+        slm = MainWindow._require_mapping(configuration["slm"], "slm")
+        return slm["width"], slm["height"]
+
+    @staticmethod
+    def _configuration_controls(configuration: Mapping[str, Any]) -> Mapping[str, Any]:
+        controls = MainWindow._require_mapping(configuration["controls"], "controls")
+        for key in ("modification", "zernike", "pattern_inclusion", "flips"):
+            if key not in controls:
+                raise ValueError(f"Configuration controls are missing {key}")
+        return controls
+
+    @staticmethod
+    def _configuration_text_inputs(
+        value: object, expected_values: Mapping[str, str], name: str
+    ) -> dict[str, str]:
+        values = MainWindow._require_mapping(value, name)
+        if set(values) != set(expected_values):
+            raise ValueError(f"Configuration {name} settings are incomplete")
+        if not all(isinstance(item, str) for item in values.values()):
+            raise ValueError(f"Configuration {name} settings must be text")
+        return {key: values[key] for key in expected_values}
+
+    @staticmethod
+    def _configuration_bool_mapping(value: object, keys: tuple[str, ...], name: str) -> dict[str, bool]:
+        values = MainWindow._require_mapping(value, name)
+        if set(values) != set(keys) or not all(isinstance(values[key], bool) for key in keys):
+            raise ValueError(f"Configuration {name} is invalid")
+        return {key: values[key] for key in keys}
+
+    @staticmethod
+    def _configuration_flip_mapping(value: object) -> dict[str, tuple[bool, bool]]:
+        flips = MainWindow._require_mapping(value, "flips")
+        components = ("base", "hologram", "modification")
+        if set(flips) != set(components):
+            raise ValueError("Configuration flips are invalid")
+        parsed_flips: dict[str, tuple[bool, bool]] = {}
+        for component in components:
+            directions = MainWindow._configuration_bool_mapping(
+                flips[component], ("horizontal", "vertical"), f"{component} flips"
+            )
+            parsed_flips[component] = directions["horizontal"], directions["vertical"]
+        return parsed_flips
+
+    @staticmethod
+    def _flip_state_mapping(states: tuple[bool, bool, bool, bool, bool, bool]) -> dict[str, dict[str, bool]]:
+        return {
+            "base": {"horizontal": states[0], "vertical": states[1]},
+            "hologram": {"horizontal": states[2], "vertical": states[3]},
+            "modification": {"horizontal": states[4], "vertical": states[5]},
+        }
+
+    @staticmethod
+    def _require_mapping(value: object, name: str) -> Mapping[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"Configuration {name} must be an object")
+        return value
+
+    @staticmethod
+    def _set_file_pattern_flips(
+        displayer: HologramManager,
+        flips: Mapping[str, tuple[bool, bool]],
+    ) -> None:
+        displayer.setFlipCorrectionPatternHorizontally(flips["base"][0], update=False)
+        displayer.setFlipCorrectionPatternVertically(flips["base"][1], update=False)
+        displayer.setFlipHologramPatternHorizontally(flips["hologram"][0], update=False)
+        displayer.setFlipHologramPatternVertically(flips["hologram"][1], update=False)
 
     def _upload_pattern(
         self,
@@ -561,6 +860,10 @@ class MainWindow(QMainWindow):
         if screen_uid is None:
             logger.error(message)
             return
+        self._write_console_for_screen(screen_uid, message)
+
+    def _write_console_for_screen(self, screen_uid: str, message: str) -> None:
+        """Write a message to the intended screen even after a selection change."""
         level, clean_message = self._console_level_and_message(message)
         self._monitor_manager.write_to_console(screen_uid, clean_message, level)
 
@@ -787,28 +1090,21 @@ class MainWindow(QMainWindow):
             self._write_console("Error: selected screen is no longer available")
             return
         height, width = displayer.shape
-        try:
-            pattern = makeSlmPhaseForSingleFocalSpot(
-                x=x * 1e-6,
-                y=y * 1e-6,
-                z=z * 1e-6,
-                wavelength=wavelength * 1e-9,
-                f_objective=focal_length * 1e-3,
-                magnification=magnification,
-                Nx=width,
-                Ny=height,
-                dx=pixel_pitch * 1e-6,
-                dy=pixel_pitch * 1e-6,
-            )
-            displayer.setModificationPattern(pattern)
-        except PatternSizeMismatchError:
-            return
-        except Exception as error:
-            self._write_console(f"Error: could not generate modification pattern: {error}")
-            return
-
-        self._last_modification_parameters[screen_uid] = parameters
-        self.updatePreview()
+        self._start_pattern_calculation(
+            screen_uid,
+            "modification",
+            parameters,
+            self._calculate_modification_pattern,
+            x,
+            y,
+            z,
+            wavelength,
+            focal_length,
+            magnification,
+            pixel_pitch,
+            width,
+            height,
+        )
 
     def _update_zernike_pattern(self) -> None:
         screen_uid = self._selected_screen_uid()
@@ -832,16 +1128,127 @@ class MainWindow(QMainWindow):
         if displayer is None:
             self._write_console("Error: selected screen is no longer available")
             return
+        height, width = displayer.shape
+        self._start_pattern_calculation(
+            screen_uid,
+            "zernike",
+            parameters,
+            self._calculate_zernike_pattern,
+            aberrations,
+            width,
+            height,
+            displayer.getZernikeCartGridIfAvailable(),
+        )
+
+    def _start_pattern_calculation(
+        self,
+        screen_uid: str,
+        component: str,
+        parameters: tuple[float, ...],
+        calculation: Callable[..., object],
+        *arguments: object,
+    ) -> None:
+        key = screen_uid, component
+        revision = self._pattern_calculation_revisions.get(key, 0) + 1
+        self._pattern_calculation_revisions[key] = revision
+        self._pending_pattern_calculations.add(key)
+        self._refresh_calculation_status()
+        future = self._pattern_executor.submit(calculation, *arguments)
+        future.add_done_callback(
+            lambda completed, uid=screen_uid, kind=component, request_revision=revision, request_parameters=parameters: self._report_pattern_calculation(
+                completed, uid, kind, request_revision, request_parameters
+            )
+        )
+
+    def _report_pattern_calculation(
+        self,
+        future: Future[object],
+        screen_uid: str,
+        component: str,
+        revision: int,
+        parameters: tuple[float, ...],
+    ) -> None:
         try:
-            displayer.setZernikeAberrations(aberrations)
+            result: object = future.result()
+        except Exception as error:
+            result = error
+        self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
+
+    @staticmethod
+    def _calculate_modification_pattern(
+        x: float,
+        y: float,
+        z: float,
+        wavelength: float,
+        focal_length: float,
+        magnification: float,
+        pixel_pitch: float,
+        width: int,
+        height: int,
+    ) -> NDArray[np.float32]:
+        return makeSlmPhaseForSingleFocalSpot(
+            x=x * 1e-6,
+            y=y * 1e-6,
+            z=z * 1e-6,
+            wavelength=wavelength * 1e-9,
+            f_objective=focal_length * 1e-3,
+            magnification=magnification,
+            Nx=width,
+            Ny=height,
+            dx=pixel_pitch * 1e-6,
+            dy=pixel_pitch * 1e-6,
+        )
+
+    @staticmethod
+    def _calculate_zernike_pattern(
+        aberrations: dict[str, float],
+        width: int,
+        height: int,
+        cart_grid: RZern | None,
+    ) -> tuple[RZern, NDArray[np.float32], dict[str, float]]:
+        if cart_grid is None:
+            cart_grid = makeCartGrid(Nx=width, Ny=height, dx=1.0, dy=1.0)
+        return cart_grid, makePattern(cart_grid, aberrations), aberrations
+
+    @Slot(str, str, int, object)
+    def _on_pattern_calculation_finished(
+        self,
+        screen_uid: str,
+        component: str,
+        revision: int,
+        payload: object,
+    ) -> None:
+        if self._pattern_calculation_revisions.get((screen_uid, component)) != revision:
+            return
+        self._pending_pattern_calculations.discard((screen_uid, component))
+        self._refresh_calculation_status()
+        parameters, result = payload
+        if isinstance(result, Exception):
+            self._write_console_for_screen(screen_uid, f"Error: could not generate {component} pattern: {result}")
+            return
+        displayer = self._monitor_manager.ensure_displayer(screen_uid)
+        if displayer is None:
+            return
+        try:
+            if component == "modification":
+                displayer.setModificationPattern(result)
+                self._last_modification_parameters[screen_uid] = parameters
+            else:
+                cart_grid, pattern, aberrations = result
+                displayer.setComputedZernikePattern(pattern, aberrations, cart_grid)
+                self._last_zernike_parameters[screen_uid] = parameters
         except PatternSizeMismatchError:
             return
         except Exception as error:
-            self._write_console(f"Error: could not generate Zernike pattern: {error}")
+            self._write_console_for_screen(screen_uid, f"Error: could not apply {component} pattern: {error}")
             return
+        if screen_uid == self._selected_screen_uid():
+            self.updatePreview()
 
-        self._last_zernike_parameters[screen_uid] = parameters
-        self.updatePreview()
+    def _refresh_calculation_status(self) -> None:
+        screen_uid = self._selected_screen_uid()
+        for component, label in self._calculation_status_labels.items():
+            label.setVisible((screen_uid, component) in self._pending_pattern_calculations)
 
     def _read_positive_modification_parameter(self, key: str) -> float:
         value = float(self._modification_parameter_fields[key].text())
@@ -976,6 +1383,7 @@ class MainWindow(QMainWindow):
             self._screen_info_fields[key].setText(value)
         self._sync_pattern_active_checks(screen_uid)
         self._sync_pattern_flip_checks(screen_uid)
+        self._refresh_calculation_status()
         self._show_console_for_screen(screen_uid)
         self.updatePreview()
 

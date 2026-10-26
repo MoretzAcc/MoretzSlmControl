@@ -230,6 +230,31 @@ class HologramManager:
             # noinspection PyTypeChecker
             return self._zernike_cart_grid
 
+    def getZernikeCartGridIfAvailable(self) -> RZern | None:
+        """Return the cached Zernike grid without creating it on the caller's thread."""
+        with self._lock:
+            return self._zernike_cart_grid
+
+    def setComputedZernikePattern(
+        self,
+        pattern: NDArray[np.floating],
+        aberrations: Mapping[str, float],
+        cart_grid: RZern,
+        update: bool = True,
+    ) -> None:
+        """Apply a Zernike pattern calculated outside the GUI thread."""
+        if pattern.shape != self.shape:
+            raise PatternSizeMismatchError(
+                f"Zernike pattern shape {pattern.shape} does not match SLM size {self.shape}"
+            )
+        with self._lock:
+            self._zernike_cart_grid = cart_grid
+            self._zernike_aberrations = dict(aberrations)
+            self._zernikePattern = wrap_phase(np.asarray(pattern, dtype=np.float32))
+            self._includeZernikePattern = True
+        if update:
+            self.publishCurrentPattern()
+
     def publishCurrentPattern(self) -> bool:
         with (self._lock):
             self._stats.submitted_count += 1
@@ -302,6 +327,25 @@ class HologramManager:
                 self._totalPattern.copy(),
             )
 
+    def getUnflippedImportedPatternSnapshots(self) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+        """Return correction and hologram patterns in their imported orientation.
+
+        Configuration export stores the patterns before the user-selected flips.
+        Import can then use the normal pattern setters before reapplying those flips.
+        """
+        with self._lock:
+            correction = self._unflip_imported_pattern(
+                self._correctionPattern,
+                self._flipCorrectionPatternHorizontally,
+                self._flipCorrectionPatternVertically,
+            )
+            hologram = self._unflip_imported_pattern(
+                self._hologramPattern,
+                self._flipHologramPatternHorizontally,
+                self._flipHologramPatternVertically,
+            )
+        return correction, hologram
+
     def getPatternInclusion(self) -> dict[str, bool]:
         """Return named inclusion states without coupling callers to component order."""
         with self._lock:
@@ -355,6 +399,15 @@ class HologramManager:
         if not flip_vertically: # Deliberate extra flip to make sure the 0,0 coordinate is at the bottom left by default.
             pattern = np.flipud(pattern)
         return np.ascontiguousarray(pattern, dtype=np.float32)
+
+    @staticmethod
+    def _unflip_imported_pattern(
+        pattern: NDArray[np.float32],
+        flip_horizontally: bool,
+        flip_vertically: bool,
+    ) -> NDArray[np.float32]:
+        """Undo the orientation conversion performed for an imported pattern."""
+        return HologramManager._flip_imported_pattern(pattern, flip_horizontally, flip_vertically)
 
     def _getBlankPattern(self) -> NDArray[np.float32]:
         return np.zeros(self.shape, dtype=np.float32)
