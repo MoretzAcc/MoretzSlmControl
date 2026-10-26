@@ -361,7 +361,16 @@ class MainWindow(QMainWindow):
                 enabled.toggled.connect(
                     lambda is_active, key=component_key: self._set_pattern_active(key, is_active)
                 )
-            layout.addWidget(enabled)
+            enabled_row = QHBoxLayout()
+            enabled_row.addWidget(enabled)
+            if component_key in ("zernike", "modification"):
+                calculation_status = QLabel("Calculating…")
+                calculation_status.setStyleSheet("color: #ef6c00; font-style: italic;")
+                calculation_status.hide()
+                self._calculation_status_labels[component_key] = calculation_status
+                enabled_row.addWidget(calculation_status)
+            enabled_row.addStretch()
+            layout.addLayout(enabled_row)
         else:
             layout.addSpacing(24)
             layout.addWidget(self._slm_window_button)
@@ -400,14 +409,6 @@ class MainWindow(QMainWindow):
 
         if has_zernike_fields:
             layout.addLayout(self._build_zernike_parameter_fields())
-
-        if component_key in ("zernike", "modification"):
-            calculation_status = QLabel("Calculating…")
-            calculation_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            calculation_status.setStyleSheet("color: #ef6c00; font-style: italic;")
-            calculation_status.hide()
-            self._calculation_status_labels[component_key] = calculation_status
-            layout.addWidget(calculation_status)
 
         layout.addStretch()
         return component

@@ -68,12 +68,4 @@ uv run python -m unittest discover -s tests
 
 ### Temp:
 
-1. Config saver. Es geht darum, dass es möglichst simple zu verstehen ist. Daher export und import button reichen.
-   Es sollen möglichst alle metadaten darin gespeichert sein, damit man das nachträglich lesen kann. json wäre bevorzugt, wär natürlich gut, wenn die aktuellen holograms da auch drinne sind, überleg dir ob das technisch einfach ist, ich will keinen Rieseneingriff. Beim import einer config soll nur das nötigste gecheckt werden. d.h. ob die slm größe identisch sind (ich glaube der rest ist kompatibel). Falls größe nicht identisch ist, muss ein popup kommen was darüber benachrichtigt und um bestätigung bittet, die config trotzdem zu applien, in dem Fall werden dann natürlich keine patterns importiert, sondern nur die anderen parameter.
-   Außerdem in die AGENTS.md rein, dass die Config bei anderen änderungen nicht vergessen werden soll.
-
-2. reset button / button um bereits / aus versehen aktivierte sessions in den nicht-initialisierten zustand zu versetzen. Mit bestätigungspopup. Möglichst minimaler eingriff
-
-3. Speed up programm
-   Es gibt zu viele laggs / initialisierung ist blocking implementiert. Ich hätte gerne dass zuerst nach speedups geschaut wird. 
-   Danach sollen die initialisierungen noch non-blocking gemacht werden, wichtig ist ein loading indicator, damit das nicht so aussieht als wärs kaputt.
+reset button / button um bereits / aus versehen aktivierte sessions in den nicht-initialisierten zustand zu versetzen. Mit bestätigungspopup. Möglichst minimaler eingriff

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -388,7 +388,7 @@ wheels = [
 
 [[package]]
 name = "moretzslmcontrol-client"
-version = "0.3.0"
+version = "0.3.4.post2"
 source = { editable = "." }
 dependencies = [
     { name = "heros" },

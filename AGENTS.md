@@ -56,6 +56,7 @@ uv run ruff check client/src
 ## Coding expectations for agents
 
 - Use English for code, comments, documentation, log messages, and all user-facing program text.
+- Update VERSION and run dev/sync_version.py when changing a distribution version.
 - When changing user-configurable state, update the configuration import/export format and tests as needed.
 - Keep changes scoped and consistent with the existing package layout.
 - Prefer small, explicit Python changes over broad refactors.

@@ -8,6 +8,7 @@ import unittest
 
 
 _REPOSITORY_ROOT = Path(__file__).parents[1]
+_VERSION_FILE = _REPOSITORY_ROOT / "VERSION"
 
 
 def _distribution_version(pyproject_path: Path) -> str:
@@ -17,12 +18,11 @@ def _distribution_version(pyproject_path: Path) -> str:
 
 
 class DistributionVersionTest(unittest.TestCase):
-    def test_server_and_client_versions_match(self) -> None:
+    def test_distribution_versions_match_the_repository_version(self) -> None:
         server_version = _distribution_version(_REPOSITORY_ROOT / "pyproject.toml")
         client_version = _distribution_version(_REPOSITORY_ROOT / "client" / "pyproject.toml")
+        repository_version = _VERSION_FILE.read_text(encoding="utf-8").strip()
 
-        self.assertEqual(
-            server_version,
-            client_version,
-            "Update the server and standalone client package versions together.",
-        )
+        self.assertTrue(repository_version, "VERSION must not be empty.")
+        self.assertEqual(server_version, repository_version, "Run dev/sync_version.py after changing VERSION.")
+        self.assertEqual(client_version, repository_version, "Run dev/sync_version.py after changing VERSION.")
