@@ -118,6 +118,20 @@ class MonitorManager(QObject):
         session.disable()
         self.recordsChanged.emit()
 
+    def reset_session(self, screen_uid: str) -> bool:
+        """Discard a display session and return its screen to the uninitialized state."""
+        session = self._sessions_by_id.pop(screen_uid, None)
+        if session is None:
+            return False
+        session.close()
+        record = self._records_by_id.get(screen_uid)
+        if record is not None:
+            record.session_id = None
+            record.was_ever_activated = False
+            record.last_error = ""
+        self.recordsChanged.emit()
+        return True
+
     def get_session(self, screen_uid: str) -> DisplaySession | None:
         return self._sessions_by_id.get(screen_uid)
 

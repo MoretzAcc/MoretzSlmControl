@@ -204,6 +204,8 @@ class MainWindow(QMainWindow):
         import_button = QPushButton("Import configuration…")
         import_button.clicked.connect(self._import_configuration)
         title_row.addWidget(import_button)
+        self._reset_session_button = QPushButton("Reset session…")
+        self._reset_session_button.clicked.connect(self._reset_session)
         page_layout.addLayout(title_row)
 
         information_row = QHBoxLayout()
@@ -1314,8 +1316,15 @@ class MainWindow(QMainWindow):
         return f"{value:g}"
 
     def _build_console_group(self) -> QGroupBox:
-        group = QGroupBox("Console")
+        group = QGroupBox()
         layout = QVBoxLayout(group)
+        title_row = QHBoxLayout()
+        console_title = QLabel("Console")
+        console_title.setStyleSheet("font-weight: 600;")
+        title_row.addWidget(console_title)
+        title_row.addStretch()
+        title_row.addWidget(self._reset_session_button)
+        layout.addLayout(title_row)
         self._console = QTextEdit()
         self._console.setReadOnly(True)
         self._console.setPlaceholderText("Nothing to show yet.")
@@ -1358,6 +1367,7 @@ class MainWindow(QMainWindow):
         self._content_stack.setCurrentWidget(self._details_page)
         self._screen_title.setText(view.display_name or "Unnamed screen")
         self._update_slm_window_button(view.state)
+        self._reset_session_button.setEnabled(self._monitor_manager.get_session(screen_uid) is not None)
         record = self._monitor_manager.get_screen_record(screen_uid)
         associated_monitors = record.associated_monitors if record is not None else []
         self._no_associated_monitors_label.setVisible(not associated_monitors)
@@ -1482,6 +1492,41 @@ class MainWindow(QMainWindow):
             self._write_console("Error: the selected screen is no longer available")
             return
         self._write_console("SLM window enabled.")
+
+    def _reset_session(self) -> None:
+        screen_uid = self._selected_screen_uid()
+        if screen_uid is None or self._monitor_manager.get_session(screen_uid) is None:
+            return
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Reset current SLM session")
+        dialog.setText("Bring this session into its initial state?")
+        dialog.setInformativeText("This clears all patterns and settings for this screen.")
+        confirm_button = dialog.addButton("Confirm", QMessageBox.ButtonRole.AcceptRole)
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
+        dialog.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        dialog.exec()
+        if dialog.clickedButton() is not confirm_button:
+            return
+
+        self._discard_session_state(screen_uid)
+        if self._monitor_manager.reset_session(screen_uid):
+            self._write_console_for_screen(screen_uid, "SLM session reset.")
+
+    def _discard_session_state(self, screen_uid: str) -> None:
+        """Forget UI-only state that belongs to a session being reset."""
+        self._loaded_patterns.pop(screen_uid, None)
+        self._loaded_pattern_paths.pop(screen_uid, None)
+        self._modification_inputs_by_screen.pop(screen_uid, None)
+        self._zernike_inputs_by_screen.pop(screen_uid, None)
+        self._last_modification_parameters.pop(screen_uid, None)
+        self._last_zernike_parameters.pop(screen_uid, None)
+        self._modification_screen_uid = None
+        self._zernike_screen_uid = None
+        for component in ("modification", "zernike"):
+            key = screen_uid, component
+            self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
+            self._pending_pattern_calculations.discard(key)
+        self._refresh_calculation_status()
 
     def _selected_screen_uid(self) -> str | None:
         item = self._list_widget.currentItem()

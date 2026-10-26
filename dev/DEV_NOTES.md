@@ -20,12 +20,6 @@ uv run python -m unittest discover -s tests
 - button to reset session into null state
   - with popup to confirm
 - Connection via Heros toggleable
-- speed up program
-    - speed up the modification pattern generation
-    - speed up the hologram generation
-    - remove freeze on parameter change
-    - precalculate default modification pattern and zernike pattern on activation of the slm, in the background such that it is non blocking
-      - show a loading indicator somewhere
 - remove duplicate code from client and server
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks
@@ -35,21 +29,6 @@ uv run python -m unittest discover -s tests
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
-- Allow saving a session (for one SLM display)
-  - Ideas: Save current state to json / hdf5
-    - save all holograms
-    - save settings
-    - save header
-      - json meta data
-        - program version (= json version)
-        - when saved
-      - screen metadata
-        - resolution for verification
-        - other info jsut for information
-  - Load session from json 
-    - respect defaults if value is not included
-    - throw warning if version is not identical
-    - throw error if resolution does not match
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
 - README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong
@@ -65,7 +44,3 @@ uv run python -m unittest discover -s tests
 - Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).
   → Aggressive scaling or fractional scaling can cause problems here.
 - Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
-
-### Temp:
-
-reset button / button um bereits / aus versehen aktivierte sessions in den nicht-initialisierten zustand zu versetzen. Mit bestätigungspopup. Möglichst minimaler eingriff
