@@ -24,6 +24,8 @@ uv run python -m unittest discover -s tests
     - speed up the modification pattern generation
     - speed up the hologram generation
     - remove freeze on parameter change
+    - precalculate default modification pattern and zernike pattern on activation of the slm, in the background such that it is non blocking
+      - show a loading indicator somewhere
 - remove duplicate code from client and server
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks
@@ -33,7 +35,6 @@ uv run python -m unittest discover -s tests
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
-
 - Allow saving a session (for one SLM display)
   - Ideas: Save current state to json / hdf5
     - save all holograms
