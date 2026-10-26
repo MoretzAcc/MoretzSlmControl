@@ -55,6 +55,7 @@ uv run ruff check client/src
 
 ## Coding expectations for agents
 
+- Use English for code, comments, documentation, log messages, and all user-facing program text.
 - Keep changes scoped and consistent with the existing package layout.
 - Prefer small, explicit Python changes over broad refactors.
 - Preserve platform branching in `app.py` and monitor adapters unless the task explicitly changes platform behavior.
