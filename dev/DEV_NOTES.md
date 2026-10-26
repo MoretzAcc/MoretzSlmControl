@@ -17,8 +17,6 @@ uv run python -m unittest discover -s tests
 ### TODO Tasks
 
 - ! Design: Rework design of the enable / disable window button
-- button to reset session into null state
-  - with popup to confirm
 - Connection via Heros toggleable
 - remove duplicate code from client and server
 - make plotHologram faster

@@ -5,10 +5,11 @@
 
 ### 26-09-16
 
-Version Bump: 0.3.4
+Version Bump: 0.3.4.post3
 
 ##### Added:
 - Export / Import Config
+- Button to reset current SLM session
 
 ##### Changed:
 - Made Zernike Pattern, Modification Pattern initialization async

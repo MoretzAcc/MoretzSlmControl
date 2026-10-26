@@ -11,6 +11,11 @@ dependencies = [
     "pillow>=12.3.0",
 ]
 
+[project.optional-dependencies]
+notebook = [
+    "ipykernel>=7.4.0",
+]
+
 [build-system]
 requires = ["uv_build>=0.9.17"]
 build-backend = "uv_build"
