@@ -16,7 +16,7 @@ uv run python -m unittest discover -s tests
 
 ### TODO Tasks
 
-- ! Rework design of the enable / disable window button
+- ! Design: Rework design of the enable / disable window button
 - button to reset session into null state
   - with popup to confirm
 - Connection via Heros toggleable
@@ -29,13 +29,13 @@ uv run python -m unittest discover -s tests
 - Method hologram_manager.py -> _set_pattern_flip stinks
 - ! Show bitdepth in the UI
     - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
-- ! Replace crossout by text "DIsabled" or "Off"
+- ! Design: Replace crossout by text "Disabled" or "Off"
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
 
 - Allow saving a session (for one SLM display)
-  - Save current state to json
+  - Ideas: Save current state to json / hdf5
     - save all holograms
     - save settings
     - save header
