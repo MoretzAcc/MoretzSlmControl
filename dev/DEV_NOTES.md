@@ -16,39 +16,17 @@ uv run python -m unittest discover -s tests
 
 ### TODO Tasks
 
-- ! Rework design of the enable / disable window button
-- button to reset session into null state
-  - with popup to confirm
+- ! Design: Rework design of the enable / disable window button
 - Connection via Heros toggleable
-- speed up program
-    - speed up the modification pattern generation
-    - speed up the hologram generation
-    - remove freeze on parameter change
 - remove duplicate code from client and server
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks
 - ! Show bitdepth in the UI
     - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
-- ! Replace crossout by text "DIsabled" or "Off"
+- ! Design: Replace crossout by text "Disabled" or "Off"
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
-
-- Allow saving a session (for one SLM display)
-  - Save current state to json
-    - save all holograms
-    - save settings
-    - save header
-      - json meta data
-        - program version (= json version)
-        - when saved
-      - screen metadata
-        - resolution for verification
-        - other info jsut for information
-  - Load session from json 
-    - respect defaults if value is not included
-    - throw warning if version is not identical
-    - throw error if resolution does not match
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
 - README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong

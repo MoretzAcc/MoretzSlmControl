@@ -3,6 +3,16 @@
 
 ---
 
+### 26-09-16
+
+Version Bump: 0.3.4.post3
+
+##### Added:
+- Export / Import Config
+- Button to reset current SLM session
+
+##### Changed:
+- Made Zernike Pattern, Modification Pattern initialization async
 
 ### 26-09-15
 
@@ -14,7 +24,6 @@ Version Bump: 0.3.3.post3
 
 ##### Changed
 - Window name is now "{Display Name} - {Screen UID}"
-
 
 ### 26-09-14
 

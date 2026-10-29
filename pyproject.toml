@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol"
-version = "0.3.3.post3"
+version = "0.3.4.post2"
 description = "Display grayscale hologram patterns for phase-only spatial light modulators."
 readme = "README.md"
 authors = [
@@ -25,7 +25,7 @@ dependencies = [
 moretzslmcontrol = "moretzslmcontrol.app:main"
 
 [build-system]
-requires = ["uv_build>=0.9.17,<0.10.0"]
+requires = ["uv_build>=0.9.17"]
 build-backend = "uv_build"
 
 [dependency-groups]

@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol-client"
-version = "0.3.3.post3"
+version = "0.3.4.post2"
 description = "Python client for controlling Moretz SLM Control instances through HEROS."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,8 +11,13 @@ dependencies = [
     "pillow>=12.3.0",
 ]
 
+[project.optional-dependencies]
+notebook = [
+    "ipykernel>=7.4.0",
+]
+
 [build-system]
-requires = ["uv_build>=0.9.17,<0.10.0"]
+requires = ["uv_build>=0.9.17"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
