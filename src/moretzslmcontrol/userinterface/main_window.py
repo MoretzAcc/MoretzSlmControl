@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -37,6 +37,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QScrollArea,
+    QSizePolicy,
+    QTabWidget,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -44,6 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 from moretzslmcontrol.monitor_stuff.models import SessionState
+from moretzslmcontrol.monitor_stuff.bit_depth import depth_summary
 from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
@@ -57,7 +61,7 @@ from moretzslmcontrol.util.config_file import (
 )
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
-from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
+from moretzslmcontrol.userinterface.ui_util.cross_out_preview import disabled_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
 if TYPE_CHECKING:
@@ -90,6 +94,7 @@ class MainWindow(QMainWindow):
         self._preview_labels: dict[str, QLabel] = {}
         self._shift_sliders: dict[str, DeferredWheelSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
+        self._shift_update_timers: dict[str, QTimer] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
         self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
         self._default_modification_inputs: dict[str, str] = {}
@@ -105,15 +110,19 @@ class MainWindow(QMainWindow):
         self._calculation_status_labels: dict[str, QLabel] = {}
         self._pattern_calculation_revisions: dict[tuple[str, str], int] = {}
         self._pending_pattern_calculations: set[tuple[str, str]] = set()
+        self._running_pattern_calculations: set[tuple[str, str]] = set()
+        self._queued_pattern_calculations: dict[tuple[str, str], tuple[Any, ...]] = {}
+        self._closing = False
         self._pattern_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pattern-calculation")
         self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
         self._monitor_manager.consoleChanged.connect(self._on_console_changed)
+        self._monitor_manager.screenGeometryChanged.connect(self._discard_session_state)
         self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")
         self.resize(1550, 880)
-        self.setMinimumSize(1280, 780)
+        self.setMinimumSize(640, 480)
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
@@ -168,6 +177,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
+        self._closing = True
+        self._queued_pattern_calculations.clear()
         self._pattern_executor.shutdown(wait=False, cancel_futures=True)
         if self._on_close_requested is not None:
             self._on_close_requested()
@@ -194,7 +205,10 @@ class MainWindow(QMainWindow):
         self._screen_title = QLabel("Screen settings")
         self._screen_title.setStyleSheet("font-size: 20px; font-weight: 600;")
         self._slm_window_button = QPushButton()
-        self._slm_window_button.setFixedHeight(52)
+        self._slm_window_button.setMinimumHeight(36)
+        self._slm_window_button.setCheckable(True)
+        self._slm_output_status = QLabel("Output off")
+        self._slm_output_status.setAccessibleName("SLM output state")
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
@@ -211,10 +225,11 @@ class MainWindow(QMainWindow):
         information_row = QHBoxLayout()
         information_row.setSpacing(12)
         screen_information = self._build_screen_information_group()
-        screen_information.setMinimumWidth(360)
-        information_row.addWidget(screen_information)
-        information_row.addWidget(self._build_monitor_information_group(), 1)
-        information_row.addWidget(self._build_applied_hologram_group())
+        metadata = QTabWidget()
+        metadata.addTab(screen_information, "Screen")
+        metadata.addTab(self._build_monitor_information_group(), "Monitors")
+        information_row.addWidget(metadata, 1)
+        information_row.addWidget(self._build_applied_hologram_group(), 1)
         page_layout.addLayout(information_row)
         lower_splitter = QSplitter(Qt.Orientation.Vertical)
         lower_splitter.setChildrenCollapsible(False)
@@ -224,23 +239,35 @@ class MainWindow(QMainWindow):
         lower_splitter.setStretchFactor(1, 0)
         lower_splitter.setSizes([800, 110])
         page_layout.addWidget(lower_splitter, 2)
-        return page
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(page)
+        return scroll
 
     def _build_applied_hologram_group(self) -> QGroupBox:
         group = QGroupBox("Hologram Preview")
-        group.setMinimumWidth(280)
+        group.setMinimumWidth(260)
         layout = QVBoxLayout(group)
+        layout.addWidget(self._slm_output_status)
         layout.addWidget(self._build_pattern_component(None, component_key="total"))
         return group
 
     def _build_screen_information_group(self) -> QGroupBox:
         group = QGroupBox("Screen information")
         layout = QFormLayout(group)
+        self._hero_connection_check = QCheckBox("Enable HEROS connection")
+        self._hero_connection_check.setChecked(True)
+        self._hero_connection_check.toggled.connect(self._toggle_heros_connection)
+        layout.addRow(self._hero_connection_check)
         self._screen_info_fields: dict[str, QLabel] = {}
         for key, label in (
             ("display_name", "Display name"),
             ("screen_name", "Screen name"),
             ("resolution", "Resolution"),
+            ("output_depth", "Software output"),
+            ("monitor_depth", "Monitor input capability"),
+            ("depth_warning", "Depth compatibility"),
             ("screen_uid", "Screen UID"),
             ("heros_name", "Hero name"),
             ("screen_connection", "Screen connection"),
@@ -298,34 +325,20 @@ class MainWindow(QMainWindow):
 
     def _build_pattern_group(self) -> QGroupBox:
         group = QGroupBox("Pattern composition")
-        layout = QHBoxLayout(group)
-        layout.setSpacing(8)
-
-        layout.addWidget(
-            self._build_pattern_component(
-                "Correction Pattern", component_key="base", has_file_selector=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component("Hologram Pattern", component_key="hologram", has_file_selector=True),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Zernike Pattern", component_key="zernike", has_zernike_fields=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Modification Pattern", component_key="modification", has_shift_controls=True
-            ),
-            1,
-        )
+        layout = QVBoxLayout(group)
+        description = QLabel("Output = Correction + Hologram + Zernike + Modification (active components only)")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        tabs = QTabWidget()
+        for title, key, options in (
+            ("Correction", "base", {"has_file_selector": True}),
+            ("Hologram", "hologram", {"has_file_selector": True}),
+            ("Zernike", "zernike", {"has_zernike_fields": True}),
+            ("Modification", "modification", {"has_shift_controls": True}),
+        ):
+            tabs.addTab(self._build_pattern_component(None, component_key=key, **options), title)
+        self._pattern_tabs = tabs
+        layout.addWidget(tabs)
         return group
 
     def _build_pattern_component(
@@ -350,7 +363,7 @@ class MainWindow(QMainWindow):
         preview = QLabel("Preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         preview.setFixedHeight(90)
-        preview.setStyleSheet("color: #d0d0d0;")
+        preview.setForegroundRole(preview.foregroundRole())
         if component_key is not None:
             self._preview_labels[component_key] = preview
         layout.addWidget(preview)
@@ -523,6 +536,7 @@ class MainWindow(QMainWindow):
                 "physical_size_mm": [record.physical_size_x, record.physical_size_y],
             },
             "controls": {
+                "connections": {"heros": displayer.isHeroEnabled()},
                 "pattern_inclusion": displayer.getPatternInclusion(),
                 "flips": self._flip_state_mapping(flip_states),
                 "modification": self._modification_inputs_by_screen[record.screen_uid],
@@ -609,6 +623,7 @@ class MainWindow(QMainWindow):
             controls["pattern_inclusion"], ("base", "hologram", "zernike", "modification"), "pattern inclusion"
         )
         flips = self._configuration_flip_mapping(controls["flips"])
+        connections = self._configuration_bool_mapping(controls.get("connections", {"heros": True}), ("heros",), "connections")
 
         correction: NDArray[np.float32] | None = None
         hologram: NDArray[np.float32] | None = None
@@ -620,6 +635,7 @@ class MainWindow(QMainWindow):
             if correction.shape != expected_shape or hologram.shape != expected_shape:
                 raise ValueError("Configuration pattern dimensions do not match the selected SLM")
 
+        self._monitor_manager.set_heros_enabled(screen_uid, connections["heros"])
         self._modification_inputs_by_screen[screen_uid] = modification_inputs
         self._zernike_inputs_by_screen[screen_uid] = zernike_inputs
         self._load_modification_inputs(screen_uid)
@@ -815,7 +831,7 @@ class MainWindow(QMainWindow):
         patterns = dict(
             zip(
                 ("base", "hologram", "zernike", "modification", "total"),
-                displayer.getPatternSnapshots(),
+                displayer.getPreviewPatternSnapshots(),
                 strict=True,
             )
         )
@@ -848,7 +864,7 @@ class MainWindow(QMainWindow):
         preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
         preview_bytes = phaseToByte(preview_phase)
         if not active:
-            preview_bytes = cross_out_preview(preview_bytes)
+            preview_bytes = disabled_preview(preview_bytes)
         image = QImage(
             preview_bytes.data,
             target_width,
@@ -900,18 +916,31 @@ class MainWindow(QMainWindow):
             f'[{escape(timestamp)}] <span style="color: {color};">{label}</span>: {escape(message)}'
         )
 
+    @staticmethod
+    def _size_numeric_field(field: QLineEdit) -> None:
+        metrics = field.fontMetrics()
+        field.setMinimumHeight(round(metrics.height() * 1.8))
+        field.setMinimumWidth(metrics.horizontalAdvance("-0.00000000") + 20)
+        field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(4)
         slider = DeferredWheelSlider(Qt.Orientation.Horizontal)
         slider.setRange(-200, 200)
         value_input = QLineEdit("0")
-        value_input.setMaximumWidth(46)
+        self._size_numeric_field(value_input)
         value_input.setAlignment(Qt.AlignmentFlag.AlignRight)
         value_input.setValidator(QDoubleValidator(value_input))
         unit_label = QLabel("µm")
         self._shift_sliders[axis] = slider
         self._shift_inputs[axis] = value_input
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(150)
+        timer.timeout.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
+        self._shift_update_timers[axis] = timer
+        slider.valueChanged.connect(lambda _value, selected_axis=axis: self._on_shift_value_changed(selected_axis))
         slider.sliderReleased.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
         slider.wheelFinished.connect(
             lambda selected_axis=axis: self._on_shift_slider_released(selected_axis)
@@ -966,9 +995,10 @@ class MainWindow(QMainWindow):
             ),
         ):
             field = QLineEdit(default_value)
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(_tooltip)
             self._modification_parameter_fields[key] = field
             if key == "max_shift":
                 field.editingFinished.connect(self._on_max_shift_edited)
@@ -995,9 +1025,10 @@ class MainWindow(QMainWindow):
             if order > zernike_order:
                 continue
             field = QLineEdit("0")
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(f"{name}: Zernike phase coefficient (radians). Radial order {order}.")
             field.editingFinished.connect(self._update_zernike_pattern)
             self._zernike_parameter_fields[name] = field
             grid.addWidget(QLabel(f"{name}:"), row, 0, alignment=Qt.AlignmentFlag.AlignRight)
@@ -1005,7 +1036,18 @@ class MainWindow(QMainWindow):
             row += 1
         return grid
 
+    def _on_shift_value_changed(self, axis: str) -> None:
+        try:
+            maximum = self._read_positive_modification_parameter("max_shift")
+        except ValueError:
+            return
+        slider = self._shift_sliders[axis]
+        self._shift_inputs[axis].setText(self._format_number(slider.value() * self._slider_tick_size(maximum)))
+        if not slider.isSliderDown():
+            self._shift_update_timers[axis].start()
+
     def _on_shift_slider_released(self, axis: str) -> None:
+        self._shift_update_timers[axis].stop()
         try:
             maximum_shift = self._read_positive_modification_parameter("max_shift")
         except ValueError as error:
@@ -1085,7 +1127,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = (x, y, z, wavelength, focal_length, magnification, pixel_pitch)
-        if self._last_modification_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "modification"
+        if (self._last_modification_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1124,7 +1169,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = tuple(aberrations.values())
-        if self._last_zernike_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "zernike"
+        if (self._last_zernike_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1156,6 +1204,15 @@ class MainWindow(QMainWindow):
         self._pattern_calculation_revisions[key] = revision
         self._pending_pattern_calculations.add(key)
         self._refresh_calculation_status()
+        request = (revision, parameters, calculation, arguments)
+        if key in self._running_pattern_calculations:
+            self._queued_pattern_calculations[key] = request
+            return
+        self._submit_pattern_calculation(screen_uid, component, request)
+
+    def _submit_pattern_calculation(self, screen_uid: str, component: str, request: tuple[Any, ...]) -> None:
+        revision, parameters, calculation, arguments = request
+        self._running_pattern_calculations.add((screen_uid, component))
         future = self._pattern_executor.submit(calculation, *arguments)
         future.add_done_callback(
             lambda completed, uid=screen_uid, kind=component, request_revision=revision, request_parameters=parameters: self._report_pattern_calculation(
@@ -1175,7 +1232,8 @@ class MainWindow(QMainWindow):
             result: object = future.result()
         except Exception as error:
             result = error
-        self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
+        if not self._closing:
+            self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
 
     @staticmethod
     def _calculate_modification_pattern(
@@ -1221,7 +1279,12 @@ class MainWindow(QMainWindow):
         revision: int,
         payload: object,
     ) -> None:
-        if self._pattern_calculation_revisions.get((screen_uid, component)) != revision:
+        key = screen_uid, component
+        self._running_pattern_calculations.discard(key)
+        queued = self._queued_pattern_calculations.pop(key, None)
+        if queued is not None and not self._closing:
+            self._submit_pattern_calculation(screen_uid, component, queued)
+        if self._closing or self._pattern_calculation_revisions.get(key) != revision:
             return
         self._pending_pattern_calculations.discard((screen_uid, component))
         self._refresh_calculation_status()
@@ -1345,8 +1408,9 @@ class MainWindow(QMainWindow):
             return
 
         if screen_uid != self._modification_screen_uid:
-            for slider in self._shift_sliders.values():
+            for axis, slider in self._shift_sliders.items():
                 slider.cancel_pending_wheel_update()
+                self._shift_update_timers[axis].stop()
             if self._modification_screen_uid is not None:
                 self._store_modification_inputs(self._modification_screen_uid)
             self._load_modification_inputs(screen_uid)
@@ -1367,6 +1431,9 @@ class MainWindow(QMainWindow):
         self._content_stack.setCurrentWidget(self._details_page)
         self._screen_title.setText(view.display_name or "Unnamed screen")
         self._update_slm_window_button(view.state)
+        self._hero_connection_check.blockSignals(True)
+        self._hero_connection_check.setChecked(self._monitor_manager.heros_enabled(screen_uid))
+        self._hero_connection_check.blockSignals(False)
         self._reset_session_button.setEnabled(self._monitor_manager.get_session(screen_uid) is not None)
         record = self._monitor_manager.get_screen_record(screen_uid)
         associated_monitors = record.associated_monitors if record is not None else []
@@ -1382,7 +1449,11 @@ class MainWindow(QMainWindow):
             file_path = pattern_paths.get(component_key, "")
             path_field.setText(Path(file_path).name if file_path else "")
             path_field.setToolTip(file_path)
+        input_depth, depth_warning = depth_summary([monitor.bits_per_channel for monitor in associated_monitors])
         for key, value in {
+            "output_depth": "8-bit grayscale (256 levels)",
+            "monitor_depth": input_depth,
+            "depth_warning": depth_warning,
             "display_name": view.display_name or "—",
             "screen_name": view.screen_name or "—",
             "resolution": view.resolution,
@@ -1461,20 +1532,29 @@ class MainWindow(QMainWindow):
         return "Disabled"
 
     def _update_slm_window_button(self, state: SessionState) -> None:
-        if self._is_slm_window_enabled(state):
-            self._slm_window_button.setText("SLM WINDOW ON  —  Disable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #1565c0; color: white; font-weight: 700; border-radius: 4px;"
-            )
-        else:
-            self._slm_window_button.setText("SLM WINDOW OFF  —  Enable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #b71c1c; color: white; font-weight: 700; border-radius: 4px;"
-            )
+        enabled = self._is_slm_window_enabled(state)
+        connected = state in (SessionState.INACTIVE_CONNECTED, SessionState.ACTIVE_CONNECTED)
+        self._slm_window_button.setChecked(enabled)
+        self._slm_window_button.setText("Disable SLM output" if enabled else "Enable SLM output")
+        self._slm_window_button.setEnabled(connected or enabled)
+        self._slm_window_button.setToolTip("Show or hide the native fullscreen SLM output without changing its pattern.")
+        self._slm_output_status.setText("Output on" if enabled and connected else "Output disconnected" if not connected else "Output off")
 
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:
         return state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED)
+
+    def _toggle_heros_connection(self, enabled: bool) -> None:
+        uid = self._selected_screen_uid()
+        if uid is None:
+            return
+        try:
+            self._monitor_manager.set_heros_enabled(uid, enabled)
+        except Exception as error:
+            self._write_console(f"Error changing HEROS connection: {error}")
+            self._hero_connection_check.blockSignals(True)
+            self._hero_connection_check.setChecked(self._monitor_manager.heros_enabled(uid))
+            self._hero_connection_check.blockSignals(False)
 
     def _toggle_slm_window(self) -> None:
         screen_uid = self._selected_screen_uid()
@@ -1526,6 +1606,7 @@ class MainWindow(QMainWindow):
             key = screen_uid, component
             self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
             self._pending_pattern_calculations.discard(key)
+            self._queued_pattern_calculations.pop(key, None)
         self._refresh_calculation_status()
 
     def _selected_screen_uid(self) -> str | None:

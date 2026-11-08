@@ -1,0 +1,7 @@
+2026-11-08 07:24:28,190 [INFO] moretzslmcontrol.monitor_stuff.platform [__init__.py:22 create_platform_adapter]: Detected Platform: linux
+2026-11-08 07:24:28,192 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:67 get_screen_edids]: Could not find EDID for connector DUMMY0
+2026-11-08 07:24:28,193 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:67 get_screen_edids]: Could not find EDID for connector DUMMY1
+2026-11-08 07:24:28,193 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:67 get_screen_edids]: Could not find EDID for connector DUMMY2
+distinct records for each Qt screen FAIL {'qt_screens': 3, 'records': 1}
+control window fits available screen PASS {'window': (0, 21, 1920, 1059), 'available': (0, 0, 1920, 1080)}
+Saved /home/rolf/projects/MoretzSlmControl/dev/review/results/three-monitors.json

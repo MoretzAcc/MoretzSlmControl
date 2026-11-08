@@ -150,8 +150,6 @@ class DisplayWindow(QWidget):
         self._show_frame(frame)
         self._lastDisplayedRevision = revision
         self._displayer.markFrameDisplayed(revision)
-        if self.isVisible():
-            self._platform_adapter.keep_window_in_focus(self)
 
     def _show_frame(self, frame: np.ndarray) -> None:
         if frame.ndim != 2:

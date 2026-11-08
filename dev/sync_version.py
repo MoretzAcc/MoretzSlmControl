@@ -22,6 +22,7 @@ def main() -> None:
         updated, replacements = VERSION_LINE.subn(rf'\g<1>"{version}"', original, count=1)
         if replacements != 1:
             raise ValueError(f"Could not find one project version in {pyproject_file}")
+        updated = re.sub(r'("moretzslmcontrol-client==)[^"]*"', rf'\g<1>{version}"', updated)
         pyproject_file.write_text(updated, encoding="utf-8")
 
 

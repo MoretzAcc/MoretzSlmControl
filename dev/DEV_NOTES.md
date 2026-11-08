@@ -1,44 +1,41 @@
+# Developer notes
 
-Run Program
-```bash
-uv run moretzslmcontrol
-```
+Run the application with `uv run moretzslmcontrol`; run `uv run ruff check .` and `uv run python -m unittest discover -s tests`.
 
-Run unit tests:
-```bash
-uv run python -m unittest discover -s tests
-```
+## Implemented fork TODOs
 
-### TODO Bugs / Issues
+Each item has its own commit and implementation/review/testing entry in [CHANGELOG-FORK.md](../CHANGELOG-FORK.md).
 
-- when slm window is enabled it gains focus (at least on linux) i dont want that
-- Windows Aero Peek, one idea to fix is in anti_aero_peak.py
+- F01: Distinct/stable missing-EDID identities and collision detection.
+- F02/F03: Coalesced Zernike/modification work; obsolete-state and reset protection.
+- F04: Immediate slider text and debounced keyboard/wheel calculations.
+- F05: Readable, scrollable numeric forms, pattern tabs and metadata tabs.
+- F06: Geometry/DPI observation and explicit native-buffer resets.
+- F07: No output-window activation or repeated frame focus stealing.
+- F08: DWM Aero Peek exclusion implemented; native Windows 11 LTSC taskbar Peek check passed (see review/windows-results/README.md).
+- F09: Theme-native enable/disable action separate from output status.
+- F10: Toggleable HEROS registration and backward-compatible configuration persistence.
+- F11: Client-owned shared file/numerical helpers; no GUI dependency or import-time network observer.
+- F12: Bounded GUI/notebook previews, full-resolution opt-out and 4K benchmark.
+- F13: Explicit validated flip controls with reversible semantics.
+- F14: Software depth and EDID input capability reporting, including >8-bit warnings.
+- F15: Translucent white Off overlay with dark text, applied only to previews.
+- F16: Usage/examples, screen-vs-monitor terminology, stable identity limits and corrected refresh/scaling documentation.
+- F17: Strict integration runner, current screenshots and 123 passing geometry/runtime expectations.
+- F06a: Stable observed identity even when EDID disappears during physical unplug.
+- F18: Prompt SIGINT/SIGTERM handling while the Qt event loop is idle.
 
-### TODO Tasks
+## Validation still requiring another environment
 
-- ! Design: Rework design of the enable / disable window button
-- Connection via Heros toggleable
-- remove duplicate code from client and server
-- make plotHologram faster
-- Method hologram_manager.py -> _set_pattern_flip stinks
-- ! Show bitdepth in the UI
-    - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
-- ! Design: Replace crossout by text "Disabled" or "Off"
-  - Black text auf white background, text and background are slightly opaque, has to be calculated
+- Windows/Aero Peek: test taskbar and Show Desktop with an actual optical output. Native Windows 11 LTSC software-compositor tests now cover taskbar Peek; physical optical output and other builds remain unverified.
+- Physical SLM hardware: verify optical phase calibration, active link precision, refresh timing and EDID completeness.
+- Fractional/aggressive DPI scaling: verify native pixel mapping on real Wayland/Windows hardware. Control UI remains scrollable, but no virtual matrix can establish optical correctness.
 
-### TODO Future Ideas
-- Support SLM with different bit depth than 8
-- Connection via Rest Api toggleable
-- README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong
+## Future ideas (outside this requested implementation)
 
-### TODO put into README
+- Native optical output with more than eight bits.
+- A separately toggleable REST API.
 
-- Examples
-- Monitor UID, Herosname should be the same for a given combination of pc + monitor + used port
-- Explain why Screen and Monitor are different and have a manyto one relation
+## Repeatable integration lab
 
-### Known Issues - Won't Fix
-
-- Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).
-  → Aggressive scaling or fractional scaling can cause problems here.
-- Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
+Read [review/README.md](review/README.md) before starting the isolated Xorg dummy display. Preserve the initial failing baseline in `review/results/`; save current verification to `review/fork-results/`.

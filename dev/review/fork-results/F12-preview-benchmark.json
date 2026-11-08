@@ -1,0 +1,15 @@
+{
+  "source_shape": [
+    2160,
+    3840
+  ],
+  "source_bytes": 33177600,
+  "preview_shape": [
+    90,
+    160
+  ],
+  "preview_bytes": 57600,
+  "full_copy_ms": 0.8695,
+  "bounded_sample_ms": 0.0525,
+  "iterations": 10
+}

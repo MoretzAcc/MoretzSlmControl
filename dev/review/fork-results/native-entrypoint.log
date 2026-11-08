@@ -1,0 +1,5 @@
+Starting moretzslmcontrol...
+[INFO] Detected Platform: linux
+[INFO] [2026/11/08 10:21:07] Closing application: received SIGTERM
+
+Supervisor check: process alive after startup; external SIGTERM processed within 3 seconds; exit status 143.

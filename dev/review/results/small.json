@@ -1,0 +1,152 @@
+{
+  "scenario": "small",
+  "checks": [
+    {
+      "name": "distinct records for each Qt screen",
+      "pass": true,
+      "qt_screens": 1,
+      "records": 1
+    },
+    {
+      "name": "control window fits available screen",
+      "pass": false,
+      "window": [
+        0,
+        21,
+        1280,
+        780
+      ],
+      "available": [
+        0,
+        0,
+        1024,
+        768
+      ]
+    },
+    {
+      "name": "allocated buffer matches selected screen",
+      "pass": true,
+      "shape": [
+        768,
+        1024
+      ]
+    },
+    {
+      "name": "NPY import produces expected grayscale bytes",
+      "pass": true
+    },
+    {
+      "name": "BMP import and component toggle",
+      "pass": true
+    },
+    {
+      "name": "horizontal flip updates output",
+      "pass": true
+    },
+    {
+      "name": "output window enabled",
+      "pass": true
+    },
+    {
+      "name": "output geometry matches target",
+      "pass": true,
+      "actual": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "target": [
+        0,
+        0,
+        1024,
+        768
+      ]
+    },
+    {
+      "name": "output pixmap has native resolution",
+      "pass": true
+    },
+    {
+      "name": "output does not steal control-window focus",
+      "pass": false,
+      "active": " - bc30d2eb"
+    },
+    {
+      "name": "output window disabled",
+      "pass": true
+    },
+    {
+      "name": "configuration export records resolution",
+      "pass": true
+    },
+    {
+      "name": "configuration import calculations complete",
+      "pass": true
+    },
+    {
+      "name": "configuration roundtrip restores flip state",
+      "pass": true
+    },
+    {
+      "name": "Zernike edit applied",
+      "pass": true
+    },
+    {
+      "name": "slider updates numeric text during drag",
+      "pass": false,
+      "before": "0",
+      "during_drag": "0",
+      "slider_value": 50
+    },
+    {
+      "name": "modification recalculation completes",
+      "pass": true
+    },
+    {
+      "name": "modification shift applied on release",
+      "pass": true
+    },
+    {
+      "name": "reset releases session",
+      "pass": true
+    }
+  ],
+  "screens": [
+    {
+      "name": "DUMMY0",
+      "geometry": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "dpr": 1.0
+    }
+  ],
+  "records": [
+    {
+      "uid": "bc30d2eb",
+      "name": "DUMMY0",
+      "resolution": "1024x768"
+    }
+  ],
+  "window_geometry": [
+    0,
+    21,
+    1280,
+    780
+  ],
+  "numeric_field_widths": {
+    "defocus": 70,
+    "asti 0": 70,
+    "asti 45": 70,
+    "coma 0": 70,
+    "coma 90": 70,
+    "primary spherical": 70,
+    "trefoil 0": 70,
+    "trefoil 90": 70,
+    "asti 2nd 0": 70,
+    "asti 2nd 45": 70
+  }
+}

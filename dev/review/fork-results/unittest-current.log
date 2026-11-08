@@ -1,0 +1,7 @@
+.................2026-11-08 10:21:57,953 [INFO] moretzslmcontrol.hologram_manager [hologram_manager.py:52 __init__]: [test] Initializing SLM DisplayerV2 with resolution: 4x4
+...............2026-11-08 10:21:58,155 [INFO] moretzslmcontrol.hologram_manager [hologram_manager.py:52 __init__]: [test] Initializing SLM DisplayerV2 with resolution: 8x4
+.......
+----------------------------------------------------------------------
+Ran 39 tests in 0.898s
+
+OK
