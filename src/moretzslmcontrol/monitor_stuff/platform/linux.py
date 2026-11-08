@@ -16,6 +16,7 @@ from PySide6.QtGui import QScreen
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 
 from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
+from moretzslmcontrol.monitor_stuff.bit_depth import edid_bits_per_channel
 from moretzslmcontrol.monitor_stuff.platform.linux_edid.get_all import get_linux_edids, LinuxMonitor
 
 if TYPE_CHECKING:
@@ -69,7 +70,7 @@ class LinuxPlatformAdapter(PlatformAdapter):
             return []
 
         # TODO this currently only gets the main monitor for each screen
-        return [MonitorEdid(os_identifier=monitor.connector_name, parsed_edid=monitor.parsed_edid)]
+        return [MonitorEdid(os_identifier=monitor.connector_name, parsed_edid=monitor.parsed_edid, bits_per_channel=edid_bits_per_channel(monitor.edid))]
 
     def refresh_edid_list(self) -> None:
         self.linux_monitors = get_linux_edids()

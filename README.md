@@ -31,9 +31,11 @@ uv run moretzslmcontrol
 ## Usage
 
 1. Select a detected screen from the sidebar.
-2. Enable its SLM window.
+2. Enable its SLM output. The control keeps keyboard focus; the native output remains fullscreen.
 3. Load correction and hologram patterns from `.npy` or `.bmp` files.
-4. Adjust the modification pattern and screen-specific settings as needed.
+4. Use the Correction, Hologram, Zernike and Modification tabs. Numeric controls remain readable in small windows; scroll the detail pane when necessary.
+5. Slider values update while dragging. Pattern calculation runs asynchronously and combines rapid edits into the newest desired state.
+6. Enable or disable the HEROS connection in the Screen tab. This leaves local output and patterns intact. Export configuration to preserve the connection preference (v2 files; legacy v1 remains readable).
 
 ## HEROS integration
 
@@ -70,14 +72,14 @@ uv run python -m unittest discover -s tests
 - The pattern coordinate origin is at the bottom left.
 - Display, Screen and Monitor are not synonymous:
   - Display and Screen can be treated as synonymous. There are defined in Software.
-  - Monitors are the hardware connected to the PC. Through screen mirroring, multiple monitors can show the same Screen. 
+  - Monitors are the hardware connected to the PC. Through screen mirroring, multiple monitors can show the same Screen.
 - Screens and Monitors do not have a safe unique ID.
   - This software generates a unique ID for each screen based on:
     - Display Name
     - Serial Numbers of all Monitors showing this screen (empty for many devices)
     - Manufacturer Date of all Monitors showing this screen
     - OS Identifies of all Monitors showing this screen (related to the connected Port)
-  - With this, it is impossible to have two screens with the same UID connected at the same time. 
+  - With this, it is impossible to have two screens with the same UID connected at the same time.
 
 ## Known issues
 

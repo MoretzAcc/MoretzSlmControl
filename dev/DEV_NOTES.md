@@ -1,11 +1,10 @@
-
 Run Program
-```bash
+```
 uv run moretzslmcontrol
 ```
 
 Run unit tests:
-```bash
+```
 uv run python -m unittest discover -s tests
 ```
 
@@ -27,6 +26,7 @@ uv run python -m unittest discover -s tests
   - Black text auf white background, text and background are slightly opaque, has to be calculated
 
 ### TODO Future Ideas
+
 - Support SLM with different bit depth than 8
 - Connection via Rest Api toggleable
 - README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong

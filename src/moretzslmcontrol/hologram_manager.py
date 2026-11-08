@@ -21,6 +21,7 @@ from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
+from moretzslmclient.preview import sample_phase
 from moretzslmcontrol.util.math_util import wrap_phase
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 
@@ -46,9 +47,13 @@ class HologramManager:
         display_name: str,
         bridge: DisplayBridge,
         report_progress: Callable[[str], None],
+        heros_enabled: bool = True,
     ) -> None:
         logger.info("[%s] Initializing SLM DisplayerV2 with resolution: %sx%s", display_name, W, H)
         self.herosName = herosName
+        self._display_name = display_name
+        self._hero_lock = threading.Lock()
+        self.heroConnector: SlmHeroConnector | None = None
         self.shape = (H, W)
         self._bridge = bridge
         self._lock = threading.Lock()
@@ -80,8 +85,37 @@ class HologramManager:
         self._latestFrame: NDArray[np.uint8] = np.full(self.shape, half_dtype_range, dtype=np.uint8)
         self._latestRevision: int = 0
         self._stats = SessionStats()
-        report_progress("Registering HERO")
-        self.heroConnector = SlmHeroConnector(self, self.herosName, display_name) # TODO make this toggleable somehow
+        if heros_enabled:
+            report_progress("Registering HERO")
+        else:
+            report_progress("HEROS connection disabled")
+        self.setHeroEnabled(heros_enabled)
+
+    def setHeroEnabled(self, enabled: bool) -> None:
+        """Register or unregister external control without touching display state."""
+        with self._hero_lock:
+            if enabled and self.heroConnector is None:
+                self.heroConnector = SlmHeroConnector(self, self.herosName, self._display_name)
+            elif not enabled and self.heroConnector is not None:
+                self.heroConnector.close()
+                self.heroConnector = None
+
+    def isHeroEnabled(self) -> bool:
+        with self._hero_lock:
+            return self.heroConnector is not None
+
+    def resize(self, height: int, width: int) -> None:
+        """Reset pixel-dependent state after a native output resolution change."""
+        if height <= 0 or width <= 0:
+            raise ValueError("Output dimensions must be positive")
+        with self._lock:
+            self.shape = (height, width)
+            for name in ("_correctionPattern", "_hologramPattern", "_zernikePattern", "_modificationPattern", "_totalPattern"):
+                setattr(self, name, np.zeros(self.shape, dtype=np.float32))
+            self._zernike_cart_grid = None
+            self._zernike_aberrations = dict.fromkeys(self._zernike_aberrations, 0.0)
+            self._latestFrame = np.full(self.shape, 128, dtype=np.uint8)
+        self.publishCurrentPattern()
 
     def enableSlmWindow(self, value: bool = True) -> None:
         """Request an explicit SLM output-window state on the GUI thread."""
@@ -306,11 +340,19 @@ class HologramManager:
 
     def close(self) -> None:
         """Release external control resources owned by this display manager."""
-        self.heroConnector.close()
+        self.setHeroEnabled(False)
 
     def write_to_console(self, message: str, level: str = "info") -> None:
         """Forward a screen-scoped message to the shared console and application logger."""
         self._bridge.notify_console(level, message)
+
+    def getPreviewPatternSnapshots(self, max_width: int = 240, max_height: int = 90) -> tuple[NDArray[np.float32], ...]:
+        """Copy only preview pixels, retaining full-resolution snapshots for the public API."""
+        with self._lock:
+            return tuple(sample_phase(pattern, max_width, max_height) for pattern in (
+                self._correctionPattern, self._hologramPattern, self._zernikePattern,
+                self._modificationPattern, self._totalPattern,
+            ))
 
     def getPatternSnapshots(
         self,
@@ -375,16 +417,28 @@ class HologramManager:
         value: bool,
         update: bool,
     ) -> None:
-        flag_name = f"_flip{component.capitalize()}Pattern{direction.capitalize()}ly"
-        pattern_name = f"_{component}Pattern"
+        controls = {
+            "correction": ("_correctionPattern", "_includeCorrectionPattern", {
+                "horizontal": "_flipCorrectionPatternHorizontally", "vertical": "_flipCorrectionPatternVertically"}),
+            "hologram": ("_hologramPattern", "_includeHologramPattern", {
+                "horizontal": "_flipHologramPatternHorizontally", "vertical": "_flipHologramPatternVertically"}),
+            "modification": ("_modificationPattern", "_includeModificationPattern", {
+                "horizontal": "_flipModificationPatternHorizontally", "vertical": "_flipModificationPatternVertically"}),
+        }
+        try:
+            pattern_name, inclusion_name, flags = controls[component]
+            flag_name = flags[direction]
+        except KeyError as error:
+            raise ValueError(f"Unsupported pattern flip: {component}/{direction}") from error
+        axis = 1 if direction == "horizontal" else 0
         with self._lock:
             if getattr(self, flag_name) == value:
                 return
             pattern = getattr(self, pattern_name)
-            flipped_pattern = np.fliplr(pattern) if direction == "horizontal" else np.flipud(pattern)
-            setattr(self, pattern_name, np.ascontiguousarray(flipped_pattern, dtype=np.float32))
+            flipped = np.ascontiguousarray(np.flip(pattern, axis=axis), dtype=np.float32)
+            setattr(self, pattern_name, flipped)
             setattr(self, flag_name, value)
-            setattr(self, f"_include{component.capitalize()}Pattern", True)
+            setattr(self, inclusion_name, True)
         if update:
             self.publishCurrentPattern()
 

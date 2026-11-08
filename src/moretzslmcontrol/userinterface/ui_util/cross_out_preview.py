@@ -1,23 +1,24 @@
+"""Preview-only inactive-state overlay; never modifies SLM output data."""
 from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from PIL import Image, ImageDraw, ImageFont
 
-crossout_thickness = 0.08
 
-
-def cross_out_preview(preview_bytes: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Overlay a relative-width X on a grayscale preview."""
+def disabled_preview(preview_bytes: NDArray[np.uint8]) -> NDArray[np.uint8]:
     height, width = preview_bytes.shape
-    rows = np.linspace(0.0, 1.0, height)[:, np.newaxis]
-    columns = np.linspace(0.0, 1.0, width)[np.newaxis, :]
-    cross_mask = (np.abs(rows - columns) <= crossout_thickness / 2) | (
-        np.abs(rows + columns - 1) <= crossout_thickness / 2
-    )
-    cross_mask_wide = (np.abs(rows - columns) <= crossout_thickness) | (
-        np.abs(rows + columns - 1) <= crossout_thickness
-    )
-    crossed_out = preview_bytes.copy()
-    crossed_out[cross_mask_wide] = np.iinfo(crossed_out.dtype).max - 2
-    crossed_out[cross_mask] = 1
-    return crossed_out
+    source = Image.fromarray(preview_bytes).convert('RGBA')
+    overlay = Image.new('RGBA', source.size)
+    painter = ImageDraw.Draw(overlay)
+    font = ImageFont.load_default(size=max(8, min(height // 3, width // 5, 18)))
+    bounds = painter.textbbox((0, 0), 'Off', font=font)
+    text_width, text_height = bounds[2]-bounds[0], bounds[3]-bounds[1]
+    left, top = (width-text_width)//2, (height-text_height)//2
+    painter.rectangle((left-4, top-3, left+text_width+4, top+text_height+3), fill=(255, 255, 255, 190))
+    painter.text((left-bounds[0], top-bounds[1]), 'Off', font=font, fill=(0, 0, 0, 235))
+    return np.array(Image.alpha_composite(source, overlay).convert('L'), dtype=np.uint8)
+
+
+# Preserve the old internal import for downstream users, with the new visual semantics.
+cross_out_preview = disabled_preview
