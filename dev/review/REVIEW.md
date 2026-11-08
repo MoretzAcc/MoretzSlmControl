@@ -1,5 +1,7 @@
 # Moretz SLM Control review and virtual-monitor verification
 
+> Historical upstream baseline. The fork implementations and current passing evidence are documented in [FORK-VALIDATION.md](FORK-VALIDATION.md) and [CHANGELOG-FORK.md](../../CHANGELOG-FORK.md).
+
 Reviewed 2026-11-08, upstream commit `81b5f2b` (`master`), version `0.3.4.post2`.
 Fork: https://github.com/MoretzAccAi/MoretzSlmControl
 

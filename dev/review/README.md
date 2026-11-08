@@ -31,6 +31,8 @@ Run the matrix from a third terminal:
 UV="$HOME/.local/bin/uv" bash dev/review/run_matrix.sh
 ```
 
+Current runs write to `dev/review/fork-results/` (`REVIEW_RESULTS_DIR` overrides it); the historical baseline under `results/` is preserved. The runner fails on a product expectation failure or exception.
+
 The runner defaults to display `:99` (`REVIEW_DISPLAY` overrides it), sets XCB, and clears inherited Xauthority/Wayland settings. Xorg uses 512 MiB of configured video memory because an 8192 x 8192 virtual framebuffer at 32 bpp exceeds 256000 KiB. The dummy driver has a 300 MHz pixel-clock limit: the 4K mode uses about 30 Hz, not 60 Hz.
 
 ## Monitor examples
@@ -64,14 +66,14 @@ To use the application manually inside the lab, start `DISPLAY=:99 uv run moretz
 
 The full-HD scenario injects `time.sleep(5)` into the real Zernike and modification calculation callables. Actual calculations still run after the delay. It measures typing latency, queued work, eventual values and the return-to-previous-value race. This models the requested five-second calculation rather than claiming all real hardware takes five seconds.
 
-JSON files contain individual expectations, observed values and failures. Expected product defects are recorded as `pass: false`; the runner continues to collect evidence. Check for `exception` in JSON as well. A successful process exit does not mean all product checks passed. Logs and screenshots accompany the JSON. `*-ui.png` captures the whole widget (which may exceed the monitor); `*-desktop.png` shows actual clipping on the monitor. `*-output.png` captures the native SLM window.
+JSON files contain individual expectations, observed values and failures. The harness collects evidence even after a failed expectation; the current matrix runner checks every expected scenario and exits unsuccessfully if any expectation or exception is recorded. The historical baseline predates this strict aggregate check. Logs and screenshots accompany the JSON. `*-ui.png` captures the whole widget (which may exceed the monitor); `*-desktop.png` shows actual clipping on the monitor. `*-output.png` captures the native SLM window.
 
 ### Limitations
 
-- Dummy Xorg outputs do not create DRM EDIDs in `/sys/class/drm`. This accurately exercises the application's no-EDID fallback, which currently merges distinct screens. Therefore independent simultaneous sessions cannot pass unmodified. The single-monitor matrix still exercises native buffers, output geometry, patterns, flips, configuration and lifecycle for each shape.
+- Dummy Xorg outputs do not create DRM EDIDs in `/sys/class/drm`. The upstream baseline merged distinct screens; F01 fixed the production fallback. Current tests use that actual fallback without a shim and verify three independent sessions, secondary-only disconnect and reconnect.
 - The harness imports the production UI and platform components directly to instrument them; it does not execute `app.main()` during each scenario. A normal application launch was separately verified in KDE.
 - Isolated screenshots use the default Qt/X11 theme, not the user's KDE dark palette. The fixed-size layout issues are visible in both environments.
 - DPI is 1.0 in this matrix. Fractional scaling, physical EDID/bit depth, Windows/Aero Peek, optical SLM behavior and physical refresh timing are not verified.
-- This is a review harness, not an assertion that production defects have been fixed.
+- The baseline review describes the old upstream behavior. See FORK-VALIDATION.md for actual fork results; Windows/physical/scaling limits remain.
 
 See [REVIEW.md](REVIEW.md) for findings and prioritized improvements, and [results/](results/) for evidence.

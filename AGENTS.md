@@ -83,5 +83,7 @@ For code changes, use the lightest verification that matches the risk:
 ## Virtual-monitor review lab
 
 - Reproducible Linux monitor and UI integration checks live in `dev/review/`. Read `dev/review/README.md` for the isolated Xorg dummy setup, geometry matrix, limitations, and screenshot capture.
-- Findings and prioritized improvements from the initial review are in `dev/review/REVIEW.md`. JSON results intentionally retain failures for reproduced production defects; successful script exit does not mean all checks passed.
-- The review lab tests actual Qt screens and the unmodified Linux adapter. Missing EDID currently causes UID collisions; do not hide this with a test-only identity shim.
+- Findings and prioritized improvements from the initial review are in `dev/review/REVIEW.md`. Historical baseline JSON retains reproduced upstream failures. The current run_matrix.sh strictly fails if any expected scenario has a failed expectation or exception.
+- The review lab tests actual Qt screens and the unmodified Linux adapter. The fork fixes missing-EDID UID collisions in production; do not hide regressions with a test-only identity shim.
+
+- Fork versions use the full upstream version plus `+moretzai.N`. Update VERSION, run dev/sync_version.py, and refresh both uv lockfiles for every independently committed fork TODO. Record implementation, review and actual testing in CHANGELOG-FORK.md.

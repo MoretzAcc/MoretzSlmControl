@@ -31,6 +31,7 @@ parser.add_argument('--slow', action='store_true')
 parser.add_argument('--collision-only', action='store_true')
 parser.add_argument('--hotplug', action='store_true')
 parser.add_argument('--no-desktop', action='store_true')
+parser.add_argument('--multi', action='store_true')
 args = parser.parse_args()
 out = Path(os.environ.get('REVIEW_RESULTS_DIR', Path(__file__).parent / 'results'))
 out.mkdir(exist_ok=True)
@@ -44,6 +45,17 @@ def spin(seconds=0.1):
     while time.monotonic() < end:
         app.processEvents()
         time.sleep(0.005)
+
+
+def reveal(widget):
+    if hasattr(window, '_pattern_tabs'):
+        for index in range(window._pattern_tabs.count()):
+            if window._pattern_tabs.widget(index).isAncestorOf(widget):
+                window._pattern_tabs.setCurrentIndex(index)
+                break
+    if hasattr(window._details_page, 'ensureWidgetVisible'):
+        window._details_page.ensureWidgetVisible(widget)
+    spin(0.03)
 
 
 def check(name, condition, **details):
@@ -79,11 +91,39 @@ window.grab().save(str(out / f'{args.name}-ui.png'))
 if not args.no_desktop:
     app.primaryScreen().grabWindow(0).save(str(out / f'{args.name}-desktop.png'))
 report['window_geometry'] = window.geometry().getRect()
+report['numeric_field_heights'] = {k: f.height() for k, f in window._zernike_parameter_fields.items()}
+if hasattr(window, '_pattern_tabs'):
+    for tab, key in ((2, 'zernike'), (3, 'modification')):
+        window._pattern_tabs.setCurrentIndex(tab)
+        reveal(next(iter(window._zernike_parameter_fields.values())) if tab == 2 else window._shift_inputs['X'])
+        window.grab().save(str(out / f'{args.name}-{key}-ui.png'))
+    window._pattern_tabs.setCurrentIndex(0)
 report['numeric_field_widths'] = {k: f.width() for k, f in window._zernike_parameter_fields.items()}
 check('distinct records for each Qt screen', len(manager.iter_debug_views()) == len(app.screens()), qt_screens=len(app.screens()), records=len(manager.iter_debug_views()))
 check('control window fits available screen', app.primaryScreen().availableGeometry().contains(window.geometry()), window=window.geometry().getRect(), available=app.primaryScreen().availableGeometry().getRect())
 
 try:
+    if args.multi:
+        sessions = {}
+        for screen in app.screens():
+            view = next(v for v in manager.iter_debug_views() if v.screen_name == screen.name())
+            manager.set_heros_enabled(view.screen_uid, False)
+            session = manager.activate_monitor(view.screen_uid)
+            sessions[screen.name()] = session
+            pattern = np.full(session.displayer.shape, 0.1*len(sessions), dtype=np.float32)
+            session.displayer.setHologramPattern(pattern)
+            spin(0.1)
+            check(f'{screen.name()} independent native output', session.window.isVisible() and session.window.geometry()==screen.geometry() and session.displayer.getLastFrameSnapshot()[1].shape==(screen.geometry().height(),screen.geometry().width()))
+            session.window.grab().save(str(out/f'{args.name}-{screen.name()}-output.png'))
+        check('all monitor HERO identities distinct', len({s.heros_name for s in sessions.values()})==len(sessions))
+        subprocess.run(['xrandr','--output','DUMMY1','--off'],check=True)
+        spin(0.3)
+        check('secondary disconnect only detaches its session', not sessions['DUMMY1'].window.isVisible() and all(s.window.isVisible() for name,s in sessions.items() if name!='DUMMY1'))
+        subprocess.run(['xrandr','--output','DUMMY1','--mode','1080x1920','--pos','1920x0'],check=True)
+        spin(0.3)
+        check('secondary reconnect restores its session', sessions['DUMMY1'].window.isVisible() and manager.get_session(sessions['DUMMY1'].session_id) is sessions['DUMMY1'])
+        for session in sessions.values():
+            manager.deactivate_monitor(session.session_id)
     if not args.collision_only:
         uid = window._selected_screen_uid()
         display = manager.ensure_displayer(uid)
@@ -101,10 +141,12 @@ try:
             check('NPY import produces expected grayscale bytes', matches_grayscale(actual, phaseToByte(pattern)))
             with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(folder / 'ramp.bmp'), '')):
                 window._choose_pattern_file('base')
+            reveal(window._pattern_active_checks['base'])
             QTest.mouseClick(window._pattern_active_checks['base'], Qt.MouseButton.LeftButton)
             spin()
             check('BMP import and component toggle', not display.getPatternInclusion()['base'] and matches_grayscale(display.getLastFrameSnapshot()[1], phaseToByte(pattern)))
             flip = window._pattern_flip_checks[('hologram', 'horizontal')]
+            reveal(flip)
             QTest.mouseClick(flip, Qt.MouseButton.LeftButton)
             spin()
             check('horizontal flip updates output', matches_grayscale(display.getLastFrameSnapshot()[1], phaseToByte(pattern[:, ::-1])))
@@ -133,13 +175,32 @@ try:
                     window._import_configuration()
                 check('configuration import calculations complete', wait_for(lambda: not window._pending_pattern_calculations))
                 check('configuration roundtrip restores flip state', display.getPatternFlipStates()[2])
+                if args.slow:
+                    window._hero_connection_check.setChecked(False)
+                    with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(config_path), '')):
+                        window._export_configuration()
+                    window._hero_connection_check.setChecked(True)
+                    with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(config_path), '')):
+                        window._import_configuration()
+                    wait_for(lambda: not window._pending_pattern_calculations)
+                    check('configuration restores disabled HEROS connection', not display.isHeroEnabled() and not window._hero_connection_check.isChecked())
+                    legacy = load_configuration(config_path)
+                    legacy['format_version'] = 1
+                    legacy['controls'].pop('connections', None)
+                    config_path.write_text(json.dumps(legacy))
+                    with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(config_path), '')):
+                        window._import_configuration()
+                    wait_for(lambda: not window._pending_pattern_calculations)
+                    check('legacy configuration retains enabled HEROS default', display.isHeroEnabled())
                 fields = list(window._zernike_parameter_fields.values())
+                reveal(fields[0])
                 fields[0].setFocus()
                 QTest.keyClick(fields[0], Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
                 QTest.keyClicks(fields[0], '0.25')
                 QTest.keyClick(fields[0], Qt.Key.Key_Tab)
                 check('Zernike edit applied', wait_for(lambda: display._zernike_aberrations.get('defocus') == 0.25))
                 slider = window._shift_sliders['X']
+                reveal(slider)
                 before = window._shift_inputs['X'].text()
                 slider.setSliderDown(True)
                 slider.setSliderPosition(50)
@@ -164,6 +225,7 @@ try:
             timer.start(20)
             started = time.monotonic()
             for i in range(6):
+                reveal(fields[i])
                 fields[i].setFocus()
                 QTest.keyClick(fields[i], Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
                 QTest.keyClicks(fields[i], str(0.1*(i+1)))
@@ -196,6 +258,7 @@ try:
             started = time.monotonic()
             for value in range(6):
                 f = window._shift_inputs['Y']
+                reveal(f)
                 f.setFocus()
                 QTest.keyClick(f, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
                 QTest.keyClicks(f, str(value+1))

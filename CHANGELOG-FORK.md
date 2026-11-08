@@ -129,3 +129,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Replace obsolete setup/refresh claims, add phase/remote examples and clarify screen-monitor relationships, connection configuration, versioning and preview sampling; map every original TODO to its implementation.
 - Review: Cross-checked public method names, uv local-client installation, resolution reset behavior and measured-vs-unverified claims. Future >8-bit/REST features remain outside the agreed scope.
 - Testing: Examples use actual client APIs and float32 patterns; full tests verify distribution versions and shared helper/API contracts. Native Windows and physical/fractional-scaling limits remain explicit. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.17 — F17: Verify all fork TODOs on native and virtual monitor geometries
+
+- Implementation: Extend the real-Qt matrix for explicit tab navigation, three independent sessions, secondary-only reconnect and HEROS v1/v2 migration; preserve historical evidence and save current screenshots separately.
+- Review: Reviewed every scenario for failed expectations/exceptions, checked actual native geometry/focus and matched documentation to measured evidence. The runner now fails on a failed expectation, exception or Ruff check.
+- Testing: 123/123 integration expectations pass plus native KDE discovery/layout. 37 regressions, repository/client Ruff and both wheel/sdist builds pass. Windows visual, physical SLM and fractional-scaling validation remain explicitly limited. Full unittest suite and Ruff passed before commit.

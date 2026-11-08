@@ -1,0 +1,164 @@
+{
+  "scenario": "vm",
+  "checks": [
+    {
+      "name": "distinct records for each Qt screen",
+      "pass": true,
+      "qt_screens": 1,
+      "records": 1
+    },
+    {
+      "name": "control window fits available screen",
+      "pass": true,
+      "window": [
+        0,
+        21,
+        1280,
+        779
+      ],
+      "available": [
+        0,
+        0,
+        1280,
+        800
+      ]
+    },
+    {
+      "name": "allocated buffer matches selected screen",
+      "pass": true,
+      "shape": [
+        800,
+        1280
+      ]
+    },
+    {
+      "name": "NPY import produces expected grayscale bytes",
+      "pass": true
+    },
+    {
+      "name": "BMP import and component toggle",
+      "pass": true
+    },
+    {
+      "name": "horizontal flip updates output",
+      "pass": true
+    },
+    {
+      "name": "output window enabled",
+      "pass": true
+    },
+    {
+      "name": "output geometry matches target",
+      "pass": true,
+      "actual": [
+        0,
+        0,
+        1280,
+        800
+      ],
+      "target": [
+        0,
+        0,
+        1280,
+        800
+      ]
+    },
+    {
+      "name": "output pixmap has native resolution",
+      "pass": true
+    },
+    {
+      "name": "output does not steal control-window focus",
+      "pass": true,
+      "active": "SLM Display Control"
+    },
+    {
+      "name": "output window disabled",
+      "pass": true
+    },
+    {
+      "name": "configuration export records resolution",
+      "pass": true
+    },
+    {
+      "name": "configuration import calculations complete",
+      "pass": true
+    },
+    {
+      "name": "configuration roundtrip restores flip state",
+      "pass": true
+    },
+    {
+      "name": "Zernike edit applied",
+      "pass": true
+    },
+    {
+      "name": "slider updates numeric text during drag",
+      "pass": true,
+      "before": "0",
+      "during_drag": "50",
+      "slider_value": 50
+    },
+    {
+      "name": "modification recalculation completes",
+      "pass": true
+    },
+    {
+      "name": "modification shift applied on release",
+      "pass": true
+    },
+    {
+      "name": "reset releases session",
+      "pass": true
+    }
+  ],
+  "screens": [
+    {
+      "name": "DUMMY0",
+      "geometry": [
+        0,
+        0,
+        1280,
+        800
+      ],
+      "dpr": 1.0
+    }
+  ],
+  "records": [
+    {
+      "uid": "bf84fea1",
+      "name": "DUMMY0",
+      "resolution": "1280x800"
+    }
+  ],
+  "window_geometry": [
+    0,
+    21,
+    1280,
+    779
+  ],
+  "numeric_field_heights": {
+    "defocus": 31,
+    "asti 0": 31,
+    "asti 45": 31,
+    "coma 0": 31,
+    "coma 90": 31,
+    "primary spherical": 31,
+    "trefoil 0": 31,
+    "trefoil 90": 31,
+    "asti 2nd 0": 31,
+    "asti 2nd 45": 31
+  },
+  "numeric_field_widths": {
+    "defocus": 108,
+    "asti 0": 108,
+    "asti 45": 108,
+    "coma 0": 108,
+    "coma 90": 108,
+    "primary spherical": 108,
+    "trefoil 0": 108,
+    "trefoil 90": 108,
+    "asti 2nd 0": 108,
+    "asti 2nd 45": 108
+  }
+}
