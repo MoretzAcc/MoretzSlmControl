@@ -4,7 +4,7 @@ This is the current fork result, separate from the historical upstream [review](
 
 ## Current outcomes
 
-- **38 unit/regression tests pass**, including deterministic coalescing, cached-value reversal, reset invalidation, live slider text, readable small-window fields, configuration versions/connection lifetime, monitor identity, resized native buffers, reversible flips, depth parsing and preview isolation.
+- **39 unit/regression tests pass**, including deterministic coalescing, cached-value reversal, reset invalidation, live slider text, readable small-window fields, configuration versions/connection lifetime, monitor identity, resized native buffers, reversible flips, depth parsing and preview isolation.
 - **Ruff passes** for the repository and standalone client.
 - Server and standalone client **wheels and source distributions build successfully**. The standalone client's import regression confirms it does not import Qt or server code and exits without a persistent discovery connection.
 - **123/123 integration expectations pass** across seven isolated-display scenarios. An additional native KDE run passes both discovery/layout expectations and saves dark-theme screenshots.
@@ -75,4 +75,8 @@ Run [run_matrix.sh](run_matrix.sh) after starting the isolated display described
 
 ## Disconnect identity follow-up
 
-Review after the full matrix identified that physical EDID can disappear before a removal callback. F06a uses the already observed QScreen-to-UID mapping instead of reading a new identity during unplug. A regression verifies that the original record/session is detached without querying unavailable EDID. The existing no-EDID matrix is unaffected; the final regression suite has 38 tests.
+Review after the full matrix identified that physical EDID can disappear before a removal callback. F06a uses the already observed QScreen-to-UID mapping instead of reading a new identity during unplug. A regression verifies that the original record/session is detached without querying unavailable EDID. The existing no-EDID matrix is unaffected; that follow-up regression suite has 38 tests.
+
+## Final native entrypoint check
+
+F18 adds a Qt/Python signal polling timer after the native entrypoint test reproduced delayed external SIGTERM handling while idle. The new subprocess regression passes, bringing the suite to 39 tests. The actual KDE entrypoint was then started and terminated cleanly with status 143 within three seconds; see [native-entrypoint.log](fork-results/native-entrypoint.log). The isolated-monitor matrix remains 123/123; these signal tests add coverage outside its original expectations.

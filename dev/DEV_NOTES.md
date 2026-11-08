@@ -21,6 +21,9 @@ Each item has its own commit and implementation/review/testing entry in [CHANGEL
 - F14: Software depth and EDID input capability reporting, including >8-bit warnings.
 - F15: Translucent white Off overlay with dark text, applied only to previews.
 - F16: Usage/examples, screen-vs-monitor terminology, stable identity limits and corrected refresh/scaling documentation.
+- F17: Strict integration runner, current screenshots and 123 passing geometry/runtime expectations.
+- F06a: Stable observed identity even when EDID disappears during physical unplug.
+- F18: Prompt SIGINT/SIGTERM handling while the Qt event loop is idle.
 
 ## Validation still requiring another environment
 

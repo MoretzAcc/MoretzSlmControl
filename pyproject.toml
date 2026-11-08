@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol"
-version = "0.3.4.post2+moretzai.19"
+version = "0.3.4.post2+moretzai.20"
 description = "Display grayscale hologram patterns for phase-only spatial light modulators."
 readme = "README.md"
 authors = [
@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "moretzslmcontrol-client==0.3.4.post2+moretzai.19",
+    "moretzslmcontrol-client==0.3.4.post2+moretzai.20",
     "colorlog>=6.11.0",
     "heros>=0.13.3",
     "ipykernel>=7.3.0",

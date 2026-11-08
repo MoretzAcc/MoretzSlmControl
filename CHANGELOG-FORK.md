@@ -147,3 +147,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Keep a low-frequency Qt timer entering Python so the existing SIGINT/SIGTERM handlers can run even without UI input.
 - Review: Final normal-entrypoint validation reproduced delayed signal handling in an otherwise idle Qt event loop. The fix preserves the existing shutdown reason/status and targets only deferred signal delivery.
 - Testing: A subprocess regression sends external SIGTERM after readiness and requires the idle Qt loop to exit with the intended status within three seconds. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.20 — F19: Record the final native-launch and regression validation
+
+- Implementation: Update validation notes and TODO disposition with the physical-unplug identity follow-up and idle-signal fix; preserve current entrypoint/regression logs.
+- Review: Checked that the report distinguishes 123 virtual-display expectations, 39 regressions, native KDE checks and unverified Windows/physical/fractional cases. Historical baseline evidence is preserved.
+- Testing: 39 regressions and Ruff pass; actual native KDE entrypoint starts and exits on SIGTERM with status 143 within three seconds. Current unit and native-entrypoint logs are saved with the review. Full unittest suite and Ruff passed before commit.
