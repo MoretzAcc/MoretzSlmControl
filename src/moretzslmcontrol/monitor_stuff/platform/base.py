@@ -26,6 +26,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class MonitorEdid:
     os_identifier: str
     parsed_edid: Edid
+    bits_per_channel: int | None = None
 
 
 class PlatformAdapter(ABC):

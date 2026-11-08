@@ -111,3 +111,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Replace synthesized attribute-name spelling with explicit component/flag mappings and one axis-based flip operation.
 - Review: Reviewed atomic pattern/flag/inclusion changes under the existing lock; reversible flips and current inclusion/export semantics are preserved.
 - Testing: Regression exercises both axes for all three supported components, roundtrip restoration and rejection of unsupported component/direction values. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.14 — F14: Display truthful output depth and warn about higher monitor capability
+
+- Implementation: Show 8-bit software output, EDID 1.4 input bits/channel and compatibility notes; parse validated digital EDID blocks on Linux/Windows and warn for >8-bit capability.
+- Review: Reviewed that framebuffer RGB depth, advertised input capability, active link depth and optical SLM phase precision are not conflated; absent/old/invalid EDID stays Unknown.
+- Testing: Fixtures cover every valid digital depth, reserved/analog/legacy/corrupt EDIDs and warning text. Physical >8-bit optical output and Windows hardware are not validated. Full unittest suite and Ruff passed before commit.

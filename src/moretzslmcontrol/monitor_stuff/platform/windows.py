@@ -16,6 +16,7 @@ from PySide6.QtGui import QScreen
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 
 from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
+from moretzslmcontrol.monitor_stuff.bit_depth import edid_bits_per_channel
 from moretzslmcontrol.monitor_stuff.platform.windows_peek import exclude_from_peek
 from moretzslmcontrol.monitor_stuff.platform.windows_edid.windows_edid import windows_match_edids
 
@@ -43,7 +44,7 @@ class WindowsPlatformAdapter(PlatformAdapter):
 
     def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
         return [
-            MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid) for win_monitor in windows_match_edids(screen)
+            MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid, bits_per_channel=edid_bits_per_channel(win_monitor.edid)) for win_monitor in windows_match_edids(screen)
         ]
 
     def attach_window_to_screen(self, window: QWidget, screen: QScreen) -> None:

@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 from moretzslmcontrol.monitor_stuff.models import SessionState
+from moretzslmcontrol.monitor_stuff.bit_depth import depth_summary
 from moretzslmcontrol.hologram_manager import PatternSizeMismatchError
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmcontrol.util.file_util import importBmpHologram, importNpyHologram
@@ -264,6 +265,9 @@ class MainWindow(QMainWindow):
             ("display_name", "Display name"),
             ("screen_name", "Screen name"),
             ("resolution", "Resolution"),
+            ("output_depth", "Software output"),
+            ("monitor_depth", "Monitor input capability"),
+            ("depth_warning", "Depth compatibility"),
             ("screen_uid", "Screen UID"),
             ("heros_name", "Hero name"),
             ("screen_connection", "Screen connection"),
@@ -1445,7 +1449,11 @@ class MainWindow(QMainWindow):
             file_path = pattern_paths.get(component_key, "")
             path_field.setText(Path(file_path).name if file_path else "")
             path_field.setToolTip(file_path)
+        input_depth, depth_warning = depth_summary([monitor.bits_per_channel for monitor in associated_monitors])
         for key, value in {
+            "output_depth": "8-bit grayscale (256 levels)",
+            "monitor_depth": input_depth,
+            "depth_warning": depth_warning,
             "display_name": view.display_name or "—",
             "screen_name": view.screen_name or "—",
             "resolution": view.resolution,
