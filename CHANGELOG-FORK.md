@@ -141,3 +141,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Resolve removal callbacks from the existing QScreen-to-UID mapping rather than querying EDID after disconnect; avoid redundant identity probes during screen addition.
 - Review: Follow-up review covered physical-monitor timing beyond the no-EDID dummy case. Previously detected EDID identities now detach their original session even when EDID can no longer be read.
 - Testing: Regression deliberately makes EDID lookup unavailable during removal and verifies the original record/session is detached without querying it. Existing geometry matrix behavior remains unchanged. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.19 — F18: Process shutdown signals while the native Qt event loop is idle
+
+- Implementation: Keep a low-frequency Qt timer entering Python so the existing SIGINT/SIGTERM handlers can run even without UI input.
+- Review: Final normal-entrypoint validation reproduced delayed signal handling in an otherwise idle Qt event loop. The fix preserves the existing shutdown reason/status and targets only deferred signal delivery.
+- Testing: A subprocess regression sends external SIGTERM after readiness and requires the idle Qt loop to exit with the intended status within three seconds. Full unittest suite and Ruff passed before commit.
