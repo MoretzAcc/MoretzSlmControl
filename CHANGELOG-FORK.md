@@ -99,3 +99,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Canonicalize NPY/BMP and phase helpers in the independent client; synchronize the server dependency; perform discovery on demand with scoped network cleanup.
 - Review: Reviewed dependency direction and corrected an import-time HEROObserver that kept standalone numerical-helper processes alive; no GUI/server dependency is introduced into the client.
 - Testing: All 256 byte values roundtrip; server/client helpers share implementation; subprocess verifies client-only imports exit without a persistent session or Qt/server imports. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.12 — F12: Bound GUI and notebook preview work before copying pixels
+
+- Implementation: Sample GUI arrays under the data lock before copying; cap notebook preview pixels while preserving native coordinate extent and full-resolution opt-out.
+- Review: Reviewed native frame/API/export paths: only visual previews are sampled. Sampling includes image edges, preserves aspect ratio and does not modify source arrays.
+- Testing: Tests cover bounded allocation, source isolation, edge samples and notebook extents/full-resolution opt-out. 4K copy/sample benchmark is stored in fork-results/F12-preview-benchmark.json. Full unittest suite and Ruff passed before commit.

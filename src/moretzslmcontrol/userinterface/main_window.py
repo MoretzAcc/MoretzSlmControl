@@ -827,7 +827,7 @@ class MainWindow(QMainWindow):
         patterns = dict(
             zip(
                 ("base", "hologram", "zernike", "modification", "total"),
-                displayer.getPatternSnapshots(),
+                displayer.getPreviewPatternSnapshots(),
                 strict=True,
             )
         )

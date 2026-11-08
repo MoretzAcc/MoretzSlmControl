@@ -21,6 +21,7 @@ from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 from moretzslmcontrol.monitor_stuff.models import SessionStats
 from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
+from moretzslmclient.preview import sample_phase
 from moretzslmcontrol.util.math_util import wrap_phase
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 
@@ -341,6 +342,14 @@ class HologramManager:
     def write_to_console(self, message: str, level: str = "info") -> None:
         """Forward a screen-scoped message to the shared console and application logger."""
         self._bridge.notify_console(level, message)
+
+    def getPreviewPatternSnapshots(self, max_width: int = 240, max_height: int = 90) -> tuple[NDArray[np.float32], ...]:
+        """Copy only preview pixels, retaining full-resolution snapshots for the public API."""
+        with self._lock:
+            return tuple(sample_phase(pattern, max_width, max_height) for pattern in (
+                self._correctionPattern, self._hologramPattern, self._zernikePattern,
+                self._modificationPattern, self._totalPattern,
+            ))
 
     def getPatternSnapshots(
         self,
