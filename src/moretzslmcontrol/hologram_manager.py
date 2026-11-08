@@ -414,16 +414,28 @@ class HologramManager:
         value: bool,
         update: bool,
     ) -> None:
-        flag_name = f"_flip{component.capitalize()}Pattern{direction.capitalize()}ly"
-        pattern_name = f"_{component}Pattern"
+        controls = {
+            "correction": ("_correctionPattern", "_includeCorrectionPattern", {
+                "horizontal": "_flipCorrectionPatternHorizontally", "vertical": "_flipCorrectionPatternVertically"}),
+            "hologram": ("_hologramPattern", "_includeHologramPattern", {
+                "horizontal": "_flipHologramPatternHorizontally", "vertical": "_flipHologramPatternVertically"}),
+            "modification": ("_modificationPattern", "_includeModificationPattern", {
+                "horizontal": "_flipModificationPatternHorizontally", "vertical": "_flipModificationPatternVertically"}),
+        }
+        try:
+            pattern_name, inclusion_name, flags = controls[component]
+            flag_name = flags[direction]
+        except KeyError as error:
+            raise ValueError(f"Unsupported pattern flip: {component}/{direction}") from error
+        axis = 1 if direction == "horizontal" else 0
         with self._lock:
             if getattr(self, flag_name) == value:
                 return
             pattern = getattr(self, pattern_name)
-            flipped_pattern = np.fliplr(pattern) if direction == "horizontal" else np.flipud(pattern)
-            setattr(self, pattern_name, np.ascontiguousarray(flipped_pattern, dtype=np.float32))
+            flipped = np.ascontiguousarray(np.flip(pattern, axis=axis), dtype=np.float32)
+            setattr(self, pattern_name, flipped)
             setattr(self, flag_name, value)
-            setattr(self, f"_include{component.capitalize()}Pattern", True)
+            setattr(self, inclusion_name, True)
         if update:
             self.publishCurrentPattern()
 

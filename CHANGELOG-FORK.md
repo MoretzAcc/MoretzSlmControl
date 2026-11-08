@@ -105,3 +105,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Sample GUI arrays under the data lock before copying; cap notebook preview pixels while preserving native coordinate extent and full-resolution opt-out.
 - Review: Reviewed native frame/API/export paths: only visual previews are sampled. Sampling includes image edges, preserves aspect ratio and does not modify source arrays.
 - Testing: Tests cover bounded allocation, source isolation, edge samples and notebook extents/full-resolution opt-out. 4K copy/sample benchmark is stored in fork-results/F12-preview-benchmark.json. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.13 — F13: Make flip state transitions explicit and validate controls
+
+- Implementation: Replace synthesized attribute-name spelling with explicit component/flag mappings and one axis-based flip operation.
+- Review: Reviewed atomic pattern/flag/inclusion changes under the existing lock; reversible flips and current inclusion/export semantics are preserved.
+- Testing: Regression exercises both axes for all three supported components, roundtrip restoration and rejection of unsupported component/direction values. Full unittest suite and Ruff passed before commit.
