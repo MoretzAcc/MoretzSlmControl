@@ -83,6 +83,8 @@ class PlatformAdapter(ABC):
 
     def configure_display_window(self, window: QWidget) -> None:
         window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        window.setWindowFlag(Qt.WindowType.WindowDoesNotAcceptFocus, True)
+        window.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
@@ -93,7 +95,6 @@ class PlatformAdapter(ABC):
         window.setGeometry(screen.geometry())
         window.showFullScreen()
         window.raise_()
-        window.activateWindow()
 
     def detach_window_from_screen(self, window: QWidget) -> None:
         window.showNormal()
@@ -102,4 +103,3 @@ class PlatformAdapter(ABC):
     def keep_window_in_focus(self, window: QWidget) -> None:
         if window.isVisible():
             window.raise_()
-            window.activateWindow()

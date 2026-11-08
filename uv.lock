@@ -598,7 +598,7 @@ wheels = [
 
 [[package]]
 name = "moretzslmcontrol"
-version = "0.3.4.post2+moretzai.6"
+version = "0.3.4.post2+moretzai.7"
 source = { editable = "." }
 dependencies = [
     { name = "colorlog" },

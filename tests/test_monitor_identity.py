@@ -29,3 +29,15 @@ class MonitorIdentityTest(unittest.TestCase):
         screen.geometry.return_value = QRect(1920, 0, 1280, 800)
         screen.devicePixelRatio.return_value = 1.5
         self.assertEqual(adapter.describe_screen(screen).screen_uid, original)
+
+    def test_showing_output_never_requests_keyboard_focus(self) -> None:
+        adapter = LinuxPlatformAdapter('xcb')
+        window = Mock()
+        screen = Mock()
+        screen.geometry.return_value = QRect(1920, 0, 1080, 1920)
+        adapter.configure_display_window(window)
+        adapter.attach_window_to_screen(window, screen)
+        adapter.keep_window_in_focus(window)
+        window.activateWindow.assert_not_called()
+        window.showFullScreen.assert_called_once()
+        window.setGeometry.assert_called_once_with(QRect(1920, 0, 1080, 1920))

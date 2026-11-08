@@ -69,3 +69,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Observe Qt geometry/DPI signals, refresh monitor metadata and resize existing sessions while preserving their identity/HERO. Clear pixel patterns/grid and invalidate UI jobs with an explicit console warning.
 - Review: Reviewed revision monotonicity, session retention, positive dimensions and stale-job invalidation. Resolution changes intentionally reset pixel-dependent content rather than silently stretching it.
 - Testing: Regression checks native buffer/frame shapes, cleared patterns/grid, unchanged connector identity and monotonic revisions. Real mode/hotplug matrix is rerun in F17. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.7 — F07: Keep keyboard focus in the control window during SLM output
+
+- Implementation: Show output without activation or keyboard focus; remove activation on attach and repeated frame refresh.
+- Review: Reviewed fullscreen placement, stacking and mouse exit controls; they remain available without keyboard activation.
+- Testing: Platform regression rejects activation requests and checks target geometry/fullscreen calls. Live focus validation follows in F17. Full unittest suite and Ruff passed before commit.
