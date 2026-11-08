@@ -47,6 +47,9 @@ class MonitorManager(QObject):
         current_ids: set[str] = set()
         for screen in self._app.screens():
             descriptor = self._platform_adapter.describe_screen(screen)
+            if descriptor.screen_uid in current_ids:
+                logger.error("Duplicate screen identity %s for %s; refusing to overwrite another screen", descriptor.screen_uid, screen.name())
+                continue
             current_ids.add(descriptor.screen_uid)
             self._known_screens[descriptor.screen_uid] = screen
             record = self._records_by_id.get(descriptor.screen_uid)

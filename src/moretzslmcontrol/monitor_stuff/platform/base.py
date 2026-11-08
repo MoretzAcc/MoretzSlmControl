@@ -39,7 +39,7 @@ class PlatformAdapter(ABC):
         pass
 
     def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
-        edids = self.get_screen_edids(screen)
+        edids = sorted(self.get_screen_edids(screen), key=lambda edid: edid.os_identifier)
         dpr = screen.devicePixelRatio()
         geometry = screen.geometry()
         width = round(geometry.width() * dpr)
@@ -58,6 +58,9 @@ class PlatformAdapter(ABC):
                 *(f"{edid.parsed_edid.serial}" for edid in edids),
             )
         )
+        if not edids:
+            # A connector remains stable across mode changes and distinguishes virtual outputs.
+            uid_source += f"_no-edid_{screen.name().strip()}"
         screen_uid = sha256(uid_source.encode("utf-8")).hexdigest()[:8]
         descriptor = ScreenDescriptor(
             display_name=display_name,

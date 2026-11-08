@@ -33,3 +33,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Preserve the initial review, screenshots, dummy-monitor lab and reproducible defects; establish fork versioning and individual work-item tracking.
 - Review: Production application source remains unchanged; historical results retain failing expectations rather than claiming fixes.
 - Testing: Initial 15 unit tests and Ruff pass; baseline real-Qt matrix documents layout, queue, stale-state, identity, focus and mode-change defects.
+
+## 0.3.4.post2+moretzai.1 — F01: Keep missing-EDID monitor identities distinct
+
+- Implementation: Use stable connector fallback IDs, deterministic EDID ordering, and refuse duplicate record overwrites.
+- Review: Verified geometry/DPR changes do not change a connector UID; EDID-backed identities preserve their existing inputs.
+- Testing: Regression covers distinct missing-EDID connectors and stable IDs across mode/position/DPR changes. Full unittest suite and Ruff passed before commit.
