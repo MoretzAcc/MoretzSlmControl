@@ -79,3 +79,9 @@ For code changes, use the lightest verification that matches the risk:
 - Be explicit about GUI/runtime verification limitations in headless environments.
 - If adding tests later, place them in a standard `tests/` directory and update this file.
 - If README gains authoritative setup or usage instructions, keep this file aligned with it.
+
+## Virtual-monitor review lab
+
+- Reproducible Linux monitor and UI integration checks live in `dev/review/`. Read `dev/review/README.md` for the isolated Xorg dummy setup, geometry matrix, limitations, and screenshot capture.
+- Findings and prioritized improvements from the initial review are in `dev/review/REVIEW.md`. JSON results intentionally retain failures for reproduced production defects; successful script exit does not mean all checks passed.
+- The review lab tests actual Qt screens and the unmodified Linux adapter. Missing EDID currently causes UID collisions; do not hide this with a test-only identity shim.
