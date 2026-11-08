@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -90,6 +90,7 @@ class MainWindow(QMainWindow):
         self._preview_labels: dict[str, QLabel] = {}
         self._shift_sliders: dict[str, DeferredWheelSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
+        self._shift_update_timers: dict[str, QTimer] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
         self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
         self._default_modification_inputs: dict[str, str] = {}
@@ -917,6 +918,12 @@ class MainWindow(QMainWindow):
         unit_label = QLabel("µm")
         self._shift_sliders[axis] = slider
         self._shift_inputs[axis] = value_input
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(150)
+        timer.timeout.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
+        self._shift_update_timers[axis] = timer
+        slider.valueChanged.connect(lambda _value, selected_axis=axis: self._on_shift_value_changed(selected_axis))
         slider.sliderReleased.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
         slider.wheelFinished.connect(
             lambda selected_axis=axis: self._on_shift_slider_released(selected_axis)
@@ -1010,7 +1017,18 @@ class MainWindow(QMainWindow):
             row += 1
         return grid
 
+    def _on_shift_value_changed(self, axis: str) -> None:
+        try:
+            maximum = self._read_positive_modification_parameter("max_shift")
+        except ValueError:
+            return
+        slider = self._shift_sliders[axis]
+        self._shift_inputs[axis].setText(self._format_number(slider.value() * self._slider_tick_size(maximum)))
+        if not slider.isSliderDown():
+            self._shift_update_timers[axis].start()
+
     def _on_shift_slider_released(self, axis: str) -> None:
+        self._shift_update_timers[axis].stop()
         try:
             maximum_shift = self._read_positive_modification_parameter("max_shift")
         except ValueError as error:
@@ -1371,8 +1389,9 @@ class MainWindow(QMainWindow):
             return
 
         if screen_uid != self._modification_screen_uid:
-            for slider in self._shift_sliders.values():
+            for axis, slider in self._shift_sliders.items():
                 slider.cancel_pending_wheel_update()
+                self._shift_update_timers[axis].stop()
             if self._modification_screen_uid is not None:
                 self._store_modification_inputs(self._modification_screen_uid)
             self._load_modification_inputs(screen_uid)

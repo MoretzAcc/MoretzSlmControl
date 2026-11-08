@@ -102,3 +102,23 @@ class CalculationSchedulingTest(unittest.TestCase):
         self.release.set()
         self.drain(lambda: not self.window._running_pattern_calculations)
         self.manager.ensure_displayer.assert_not_called()
+
+    def test_drag_updates_text_before_release_without_starting_calculation(self) -> None:
+        self.window._update_modification_pattern = Mock()
+        slider = self.window._shift_sliders['X']
+        slider.setSliderDown(True)
+        slider.setSliderPosition(42)
+        self.assertEqual(self.window._shift_inputs['X'].text(), '42')
+        self.window._update_modification_pattern.assert_not_called()
+        slider.setSliderDown(False)
+        self.window._update_modification_pattern.assert_called_once()
+
+    def test_non_drag_slider_changes_are_debounced(self) -> None:
+        self.window._update_modification_pattern = Mock()
+        slider = self.window._shift_sliders['Y']
+        for value in (1, 2, 3):
+            slider.setValue(value)
+        self.assertEqual(self.window._shift_inputs['Y'].text(), '3')
+        self.window._update_modification_pattern.assert_not_called()
+        self.drain(lambda: self.window._update_modification_pattern.called)
+        self.window._update_modification_pattern.assert_called_once()

@@ -51,3 +51,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Apply the latest-snapshot scheduler to modification work, including return-to-applied requests; keep screen/component queues separate.
 - Review: Reviewed shared completion flow and generation invalidation; reset cannot recreate a session from a late result.
 - Testing: Event-gated regressions verify bounded modification work, newest-only application and reset invalidation. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.4 — F04: Show slider values immediately and debounce non-drag edits
+
+- Implementation: Update numeric text on every slider value change; calculate on drag release and debounce keyboard/wheel changes; stop timers when switching screens.
+- Review: Reviewed that text feedback performs no pattern work and programmatic blocked updates do not schedule calculations.
+- Testing: Qt regressions verify live drag text, release-only computation and debounced non-drag changes. Full unittest suite and Ruff passed before commit.
