@@ -37,6 +37,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QScrollArea,
+    QSizePolicy,
+    QTabWidget,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -117,7 +120,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("SLM Display Control")
         self.resize(1550, 880)
-        self.setMinimumSize(1280, 780)
+        self.setMinimumSize(640, 480)
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
@@ -217,10 +220,11 @@ class MainWindow(QMainWindow):
         information_row = QHBoxLayout()
         information_row.setSpacing(12)
         screen_information = self._build_screen_information_group()
-        screen_information.setMinimumWidth(360)
-        information_row.addWidget(screen_information)
-        information_row.addWidget(self._build_monitor_information_group(), 1)
-        information_row.addWidget(self._build_applied_hologram_group())
+        metadata = QTabWidget()
+        metadata.addTab(screen_information, "Screen")
+        metadata.addTab(self._build_monitor_information_group(), "Monitors")
+        information_row.addWidget(metadata, 1)
+        information_row.addWidget(self._build_applied_hologram_group(), 1)
         page_layout.addLayout(information_row)
         lower_splitter = QSplitter(Qt.Orientation.Vertical)
         lower_splitter.setChildrenCollapsible(False)
@@ -230,7 +234,11 @@ class MainWindow(QMainWindow):
         lower_splitter.setStretchFactor(1, 0)
         lower_splitter.setSizes([800, 110])
         page_layout.addWidget(lower_splitter, 2)
-        return page
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(page)
+        return scroll
 
     def _build_applied_hologram_group(self) -> QGroupBox:
         group = QGroupBox("Hologram Preview")
@@ -304,34 +312,20 @@ class MainWindow(QMainWindow):
 
     def _build_pattern_group(self) -> QGroupBox:
         group = QGroupBox("Pattern composition")
-        layout = QHBoxLayout(group)
-        layout.setSpacing(8)
-
-        layout.addWidget(
-            self._build_pattern_component(
-                "Correction Pattern", component_key="base", has_file_selector=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component("Hologram Pattern", component_key="hologram", has_file_selector=True),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Zernike Pattern", component_key="zernike", has_zernike_fields=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Modification Pattern", component_key="modification", has_shift_controls=True
-            ),
-            1,
-        )
+        layout = QVBoxLayout(group)
+        description = QLabel("Output = Correction + Hologram + Zernike + Modification (active components only)")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        tabs = QTabWidget()
+        for title, key, options in (
+            ("Correction", "base", {"has_file_selector": True}),
+            ("Hologram", "hologram", {"has_file_selector": True}),
+            ("Zernike", "zernike", {"has_zernike_fields": True}),
+            ("Modification", "modification", {"has_shift_controls": True}),
+        ):
+            tabs.addTab(self._build_pattern_component(None, component_key=key, **options), title)
+        self._pattern_tabs = tabs
+        layout.addWidget(tabs)
         return group
 
     def _build_pattern_component(
@@ -356,7 +350,7 @@ class MainWindow(QMainWindow):
         preview = QLabel("Preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         preview.setFixedHeight(90)
-        preview.setStyleSheet("color: #d0d0d0;")
+        preview.setForegroundRole(preview.foregroundRole())
         if component_key is not None:
             self._preview_labels[component_key] = preview
         layout.addWidget(preview)
@@ -906,13 +900,20 @@ class MainWindow(QMainWindow):
             f'[{escape(timestamp)}] <span style="color: {color};">{label}</span>: {escape(message)}'
         )
 
+    @staticmethod
+    def _size_numeric_field(field: QLineEdit) -> None:
+        metrics = field.fontMetrics()
+        field.setMinimumHeight(round(metrics.height() * 1.8))
+        field.setMinimumWidth(metrics.horizontalAdvance("-0.00000000") + 20)
+        field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(4)
         slider = DeferredWheelSlider(Qt.Orientation.Horizontal)
         slider.setRange(-200, 200)
         value_input = QLineEdit("0")
-        value_input.setMaximumWidth(46)
+        self._size_numeric_field(value_input)
         value_input.setAlignment(Qt.AlignmentFlag.AlignRight)
         value_input.setValidator(QDoubleValidator(value_input))
         unit_label = QLabel("µm")
@@ -978,9 +979,10 @@ class MainWindow(QMainWindow):
             ),
         ):
             field = QLineEdit(default_value)
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(_tooltip)
             self._modification_parameter_fields[key] = field
             if key == "max_shift":
                 field.editingFinished.connect(self._on_max_shift_edited)
@@ -1007,9 +1009,10 @@ class MainWindow(QMainWindow):
             if order > zernike_order:
                 continue
             field = QLineEdit("0")
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(f"{name}: Zernike phase coefficient (radians). Radial order {order}.")
             field.editingFinished.connect(self._update_zernike_pattern)
             self._zernike_parameter_fields[name] = field
             grid.addWidget(QLabel(f"{name}:"), row, 0, alignment=Qt.AlignmentFlag.AlignRight)

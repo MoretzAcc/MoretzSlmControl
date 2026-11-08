@@ -57,3 +57,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Update numeric text on every slider value change; calculate on drag release and debounce keyboard/wheel changes; stop timers when switching screens.
 - Review: Reviewed that text feedback performs no pattern work and programmatic blocked updates do not schedule calculations.
 - Testing: Qt regressions verify live drag text, release-only computation and debounced non-drag changes. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.5 — F05: Make pattern controls readable in scrollable responsive sections
+
+- Implementation: Replace squeezed four-column forms with full-width pattern tabs, metadata tabs and a scrollable detail pane; use font-relative numeric sizes, theme text colors and parameter tooltips.
+- Review: Reviewed that output geometry is independent of control layout; small windows can scroll instead of reducing numeric controls to slits.
+- Testing: Qt regression checks 1024x768 sizing and minimum field heights; native KDE UI run and screenshot saved under dev/review/fork-results. Full unittest suite and Ruff passed before commit.

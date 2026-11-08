@@ -122,3 +122,14 @@ class CalculationSchedulingTest(unittest.TestCase):
         self.window._update_modification_pattern.assert_not_called()
         self.drain(lambda: self.window._update_modification_pattern.called)
         self.window._update_modification_pattern.assert_called_once()
+
+    def test_small_window_preserves_numeric_control_height(self) -> None:
+        self.window._content_stack.setCurrentWidget(self.window._details_page)
+        self.window._pattern_tabs.setCurrentIndex(2)
+        self.window.resize(1024, 768)
+        self.window.show()
+        self.app.processEvents()
+        self.assertLessEqual(self.window.width(), 1024)
+        for field in self.window._zernike_parameter_fields.values():
+            self.assertGreaterEqual(field.height(), field.fontMetrics().height()*1.7)
+            self.assertGreaterEqual(field.width(), 100)
