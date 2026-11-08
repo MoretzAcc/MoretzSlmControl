@@ -153,3 +153,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Update validation notes and TODO disposition with the physical-unplug identity follow-up and idle-signal fix; preserve current entrypoint/regression logs.
 - Review: Checked that the report distinguishes 123 virtual-display expectations, 39 regressions, native KDE checks and unverified Windows/physical/fractional cases. Historical baseline evidence is preserved.
 - Testing: 39 regressions and Ruff pass; actual native KDE entrypoint starts and exits on SIGTERM with status 143 within three seconds. Current unit and native-entrypoint logs are saved with the review. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.21 — F20: Validate Aero Peek in a reusable native Windows lab
+
+- Implementation: Added native production-window A/B probe, repeatable Explorer thumbnail-hover controller, screenshots and persistent Windows lab instructions; production code is unchanged.
+- Review: Verified real DWM setter results, changing reference, protected HWND identity, pixel comparisons and restoration; documented inconclusive keyboard trials and software-compositor limits.
+- Testing: Two taskbar trials passed all 10 expectations on Windows 11 LTSC build 26100; native Windows unittest ran 39 tests with 38 passed and one Unix-only skip. Full unittest suite and Ruff passed before commit.

@@ -65,7 +65,7 @@ Notebook previews default to approximately one million pixels, preserve native c
 
 ## Review limitations and remaining environment checks
 
-- Windows Aero Peek is implemented against DWM with pointer-sized HWND and four-byte BOOL arguments. Success/failure contracts are tested on Linux; **visual verification on Windows remains pending**.
+- Windows Aero Peek is implemented against DWM with pointer-sized HWND and four-byte BOOL arguments. Success/failure contracts are tested on Linux. Native Windows 11 LTSC validation now passes; see [Windows results](windows-results/README.md). Physical optical output and other Windows builds remain unverified.
 - EDID depth tests use valid/corrupt digital/analog/legacy fixtures. Real optical phase precision, active transport depth and >8-bit hardware are **not verified**. Higher-depth optical output remains outside scope.
 - Integer geometry/DPI dimension changes invalidate jobs and reset pixel-dependent state. Fractional/aggressive scaling requires real compositor/hardware tests; the 1.0-DPR lab does not establish those cases.
 - Large-resolution Zernike grids/configuration import are intentionally not run in ultrawide/4K scenarios; full-HD and smaller cases exercise those paths.

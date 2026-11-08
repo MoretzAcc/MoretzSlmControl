@@ -12,7 +12,7 @@ Each item has its own commit and implementation/review/testing entry in [CHANGEL
 - F05: Readable, scrollable numeric forms, pattern tabs and metadata tabs.
 - F06: Geometry/DPI observation and explicit native-buffer resets.
 - F07: No output-window activation or repeated frame focus stealing.
-- F08: DWM Aero Peek exclusion implemented; native Windows visual check pending.
+- F08: DWM Aero Peek exclusion implemented; native Windows 11 LTSC taskbar Peek check passed (see review/windows-results/README.md).
 - F09: Theme-native enable/disable action separate from output status.
 - F10: Toggleable HEROS registration and backward-compatible configuration persistence.
 - F11: Client-owned shared file/numerical helpers; no GUI dependency or import-time network observer.
@@ -27,7 +27,7 @@ Each item has its own commit and implementation/review/testing entry in [CHANGEL
 
 ## Validation still requiring another environment
 
-- Windows/Aero Peek: test taskbar and Show Desktop with an actual optical output. Linux tests cover API arguments/failure handling, not Windows composition behavior.
+- Windows/Aero Peek: test taskbar and Show Desktop with an actual optical output. Native Windows 11 LTSC software-compositor tests now cover taskbar Peek; physical optical output and other builds remain unverified.
 - Physical SLM hardware: verify optical phase calibration, active link precision, refresh timing and EDID completeness.
 - Fractional/aggressive DPI scaling: verify native pixel mapping on real Wayland/Windows hardware. Control UI remains scrollable, but no virtual matrix can establish optical correctness.
 
