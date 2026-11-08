@@ -117,3 +117,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Show 8-bit software output, EDID 1.4 input bits/channel and compatibility notes; parse validated digital EDID blocks on Linux/Windows and warn for >8-bit capability.
 - Review: Reviewed that framebuffer RGB depth, advertised input capability, active link depth and optical SLM phase precision are not conflated; absent/old/invalid EDID stays Unknown.
 - Testing: Fixtures cover every valid digital depth, reserved/analog/legacy/corrupt EDIDs and warning text. Physical >8-bit optical output and Windows hardware are not validated. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.15 — F15: Replace crossed-out previews with a translucent Off label
+
+- Implementation: Draw centered dark Off text on a partially opaque white preview-only background; retain old helper import as a compatibility alias.
+- Review: Reviewed that only bounded preview copies are painted; native buffers, configuration exports and phase composition never receive the overlay.
+- Testing: Image regressions check localized light background/dark text, unchanged source bytes, grayscale shape/dtype and very small previews. Full unittest suite and Ruff passed before commit.

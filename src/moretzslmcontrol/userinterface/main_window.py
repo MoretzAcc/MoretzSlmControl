@@ -61,7 +61,7 @@ from moretzslmcontrol.util.config_file import (
 )
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
-from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
+from moretzslmcontrol.userinterface.ui_util.cross_out_preview import disabled_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
 if TYPE_CHECKING:
@@ -864,7 +864,7 @@ class MainWindow(QMainWindow):
         preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
         preview_bytes = phaseToByte(preview_phase)
         if not active:
-            preview_bytes = cross_out_preview(preview_bytes)
+            preview_bytes = disabled_preview(preview_bytes)
         image = QImage(
             preview_bytes.data,
             target_width,
