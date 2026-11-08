@@ -56,8 +56,6 @@ for index in range(2):
  print('Trial',index+1,'active differences',d,'restored',restore,flush=True)
 (ROOT/'results/taskbar-repeated-result.json').write_text(json.dumps(r,indent=2))
 # Close only this test's control window; its close event releases native resources.
-run(sys.executable,str(HERE/'mouse.py'),'80','60','--click')
-time.sleep(.5)
-run(sys.executable,str(HERE/'vm.py'),'qmp',json.dumps({'execute':'send-key','arguments':{'keys':[{'type':'qcode','data':'alt'},{'type':'qcode','data':'f4'}],'hold-time':100}}))
+run(sys.executable,str(HERE/'mouse.py'),'1017','13','--click')
 if not all(c['pass'] for c in r['checks']):raise SystemExit('A reference, protected output or restoration expectation failed')
 print('All',len(r['checks']),'native taskbar expectations passed.')

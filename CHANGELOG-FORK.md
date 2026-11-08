@@ -159,3 +159,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Added native production-window A/B probe, repeatable Explorer thumbnail-hover controller, screenshots and persistent Windows lab instructions; production code is unchanged.
 - Review: Verified real DWM setter results, changing reference, protected HWND identity, pixel comparisons and restoration; documented inconclusive keyboard trials and software-compositor limits.
 - Testing: Two taskbar trials passed all 10 expectations on Windows 11 LTSC build 26100; native Windows unittest ran 39 tests with 38 passed and one Unix-only skip. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.22 — F20a: Make Windows probe cleanup clicks reliable
+
+- Implementation: Send USB tablet button-down and button-up as separate QMP events with an observation interval.
+- Review: Confirmed the standalone native probe completes successfully and releases its output windows; no production code changed.
+- Testing: Repeated both native taskbar trials after a normal Windows restart: 10/10 visual expectations passed. Full unittest suite and Ruff passed before commit.
