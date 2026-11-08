@@ -39,6 +39,7 @@ class MonitorManager(QObject):
         self._sessions_by_id: dict[str, DisplaySession] = {}
         self._known_screens: dict[str, QScreen] = {}
         self._observed_screens: set[QScreen] = set()
+        self._heros_enabled: dict[str, bool] = {}
         self._console_entries_by_id: dict[str, deque[tuple[str, str, str]]] = {}
 
         self._app.screenAdded.connect(self._on_screen_added)
@@ -149,6 +150,16 @@ class MonitorManager(QObject):
         self.recordsChanged.emit()
         return True
 
+    def heros_enabled(self, screen_uid: str) -> bool:
+        return self._heros_enabled.get(screen_uid, True)
+
+    def set_heros_enabled(self, screen_uid: str, enabled: bool) -> None:
+        session = self.get_session(screen_uid)
+        if session is not None:
+            session.displayer.setHeroEnabled(enabled)
+        self._heros_enabled[screen_uid] = enabled
+        self.recordsChanged.emit()
+
     def get_session(self, screen_uid: str) -> DisplaySession | None:
         return self._sessions_by_id.get(screen_uid)
 
@@ -176,7 +187,7 @@ class MonitorManager(QObject):
         def report_progress(message: str) -> None:
             self.write_to_console(record.screen_uid, message)
 
-        session = DisplaySession(record, self._platform_adapter, report_progress)
+        session = DisplaySession(record, self._platform_adapter, report_progress, self.heros_enabled(record.screen_uid))
         session.bridge.statsChanged.connect(self._on_session_stats_changed)
         session.bridge.consoleMessage.connect(self._on_session_console_message)
         session.bridge.slmWindowEnableRequested.connect(self._on_slm_window_enable_requested)

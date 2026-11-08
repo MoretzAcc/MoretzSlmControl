@@ -255,6 +255,10 @@ class MainWindow(QMainWindow):
     def _build_screen_information_group(self) -> QGroupBox:
         group = QGroupBox("Screen information")
         layout = QFormLayout(group)
+        self._hero_connection_check = QCheckBox("Enable HEROS connection")
+        self._hero_connection_check.setChecked(True)
+        self._hero_connection_check.toggled.connect(self._toggle_heros_connection)
+        layout.addRow(self._hero_connection_check)
         self._screen_info_fields: dict[str, QLabel] = {}
         for key, label in (
             ("display_name", "Display name"),
@@ -528,6 +532,7 @@ class MainWindow(QMainWindow):
                 "physical_size_mm": [record.physical_size_x, record.physical_size_y],
             },
             "controls": {
+                "connections": {"heros": displayer.isHeroEnabled()},
                 "pattern_inclusion": displayer.getPatternInclusion(),
                 "flips": self._flip_state_mapping(flip_states),
                 "modification": self._modification_inputs_by_screen[record.screen_uid],
@@ -614,6 +619,7 @@ class MainWindow(QMainWindow):
             controls["pattern_inclusion"], ("base", "hologram", "zernike", "modification"), "pattern inclusion"
         )
         flips = self._configuration_flip_mapping(controls["flips"])
+        connections = self._configuration_bool_mapping(controls.get("connections", {"heros": True}), ("heros",), "connections")
 
         correction: NDArray[np.float32] | None = None
         hologram: NDArray[np.float32] | None = None
@@ -625,6 +631,7 @@ class MainWindow(QMainWindow):
             if correction.shape != expected_shape or hologram.shape != expected_shape:
                 raise ValueError("Configuration pattern dimensions do not match the selected SLM")
 
+        self._monitor_manager.set_heros_enabled(screen_uid, connections["heros"])
         self._modification_inputs_by_screen[screen_uid] = modification_inputs
         self._zernike_inputs_by_screen[screen_uid] = zernike_inputs
         self._load_modification_inputs(screen_uid)
@@ -1420,6 +1427,9 @@ class MainWindow(QMainWindow):
         self._content_stack.setCurrentWidget(self._details_page)
         self._screen_title.setText(view.display_name or "Unnamed screen")
         self._update_slm_window_button(view.state)
+        self._hero_connection_check.blockSignals(True)
+        self._hero_connection_check.setChecked(self._monitor_manager.heros_enabled(screen_uid))
+        self._hero_connection_check.blockSignals(False)
         self._reset_session_button.setEnabled(self._monitor_manager.get_session(screen_uid) is not None)
         record = self._monitor_manager.get_screen_record(screen_uid)
         associated_monitors = record.associated_monitors if record is not None else []
@@ -1525,6 +1535,18 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:
         return state in (SessionState.ACTIVE_CONNECTED, SessionState.ACTIVE_DISCONNECTED)
+
+    def _toggle_heros_connection(self, enabled: bool) -> None:
+        uid = self._selected_screen_uid()
+        if uid is None:
+            return
+        try:
+            self._monitor_manager.set_heros_enabled(uid, enabled)
+        except Exception as error:
+            self._write_console(f"Error changing HEROS connection: {error}")
+            self._hero_connection_check.blockSignals(True)
+            self._hero_connection_check.setChecked(self._monitor_manager.heros_enabled(uid))
+            self._hero_connection_check.blockSignals(False)
 
     def _toggle_slm_window(self) -> None:
         screen_uid = self._selected_screen_uid()

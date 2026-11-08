@@ -46,9 +46,13 @@ class HologramManager:
         display_name: str,
         bridge: DisplayBridge,
         report_progress: Callable[[str], None],
+        heros_enabled: bool = True,
     ) -> None:
         logger.info("[%s] Initializing SLM DisplayerV2 with resolution: %sx%s", display_name, W, H)
         self.herosName = herosName
+        self._display_name = display_name
+        self._hero_lock = threading.Lock()
+        self.heroConnector: SlmHeroConnector | None = None
         self.shape = (H, W)
         self._bridge = bridge
         self._lock = threading.Lock()
@@ -81,7 +85,20 @@ class HologramManager:
         self._latestRevision: int = 0
         self._stats = SessionStats()
         report_progress("Registering HERO")
-        self.heroConnector = SlmHeroConnector(self, self.herosName, display_name) # TODO make this toggleable somehow
+        self.setHeroEnabled(heros_enabled)
+
+    def setHeroEnabled(self, enabled: bool) -> None:
+        """Register or unregister external control without touching display state."""
+        with self._hero_lock:
+            if enabled and self.heroConnector is None:
+                self.heroConnector = SlmHeroConnector(self, self.herosName, self._display_name)
+            elif not enabled and self.heroConnector is not None:
+                self.heroConnector.close()
+                self.heroConnector = None
+
+    def isHeroEnabled(self) -> bool:
+        with self._hero_lock:
+            return self.heroConnector is not None
 
     def resize(self, height: int, width: int) -> None:
         """Reset pixel-dependent state after a native output resolution change."""
@@ -319,7 +336,7 @@ class HologramManager:
 
     def close(self) -> None:
         """Release external control resources owned by this display manager."""
-        self.heroConnector.close()
+        self.setHeroEnabled(False)
 
     def write_to_console(self, message: str, level: str = "info") -> None:
         """Forward a screen-scoped message to the shared console and application logger."""

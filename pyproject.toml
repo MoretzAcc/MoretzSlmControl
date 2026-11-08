@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol"
-version = "0.3.4.post2+moretzai.9"
+version = "0.3.4.post2+moretzai.10"
 description = "Display grayscale hologram patterns for phase-only spatial light modulators."
 readme = "README.md"
 authors = [
