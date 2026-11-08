@@ -93,3 +93,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Add per-screen external-control toggles without forcing session creation; unregister/re-register HERO while retaining frames; export connection state in configuration v2 and read v1 files.
 - Review: Reviewed connector lifetime, idempotent toggling, disabled-session initialization and API compatibility. Legacy configurations retain the previous enabled default.
 - Testing: Regressions cover disabled startup, repeated toggles, preserved frames, reconnect, and v1/v2 configuration loading; client/server contract tests remain green. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.11 — F11: Share numerical and file helpers through the independent client package
+
+- Implementation: Canonicalize NPY/BMP and phase helpers in the independent client; synchronize the server dependency; perform discovery on demand with scoped network cleanup.
+- Review: Reviewed dependency direction and corrected an import-time HEROObserver that kept standalone numerical-helper processes alive; no GUI/server dependency is introduced into the client.
+- Testing: All 256 byte values roundtrip; server/client helpers share implementation; subprocess verifies client-only imports exit without a persistent session or Qt/server imports. Full unittest suite and Ruff passed before commit.

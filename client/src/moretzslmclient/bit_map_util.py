@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
+PI32 = np.float32(np.pi)
+
 if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
     ...
 
@@ -19,8 +21,8 @@ def phaseToByte(phase: NDArray[np.float32]) -> NDArray[np.uint8]:
     """
 
     if phase.dtype != np.float32:
-        raise ValueError("byteToPhase expects a uint8 array")
-    val = np.asarray(phase, dtype=np.float32) * 128 / np.pi + 128
+        raise ValueError("phaseToByte expects a float32 array")
+    val = np.asarray(phase, dtype=np.float32) * 128 / PI32 + 128
     return np.mod(val.round(), 256).astype(np.uint8)
 
 def byteToPhase(byte: NDArray[np.uint8]) -> NDArray[np.float32]:
@@ -29,5 +31,5 @@ def byteToPhase(byte: NDArray[np.uint8]) -> NDArray[np.float32]:
     """
     if byte.dtype != np.uint8:
         raise ValueError("byteToPhase expects a uint8 array")
-    val = np.mod(np.asarray(byte, dtype=np.uint8).astype(np.uint32), 256)
-    return val * (np.pi / 128)  - np.pi
+    val = np.asarray(byte, dtype=np.float32)
+    return val * (PI32 / 128)  - PI32
