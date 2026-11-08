@@ -123,3 +123,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Draw centered dark Off text on a partially opaque white preview-only background; retain old helper import as a compatibility alias.
 - Review: Reviewed that only bounded preview copies are painted; native buffers, configuration exports and phase composition never receive the overlay.
 - Testing: Image regressions check localized light background/dark text, unchanged source bytes, grayscale shape/dtype and very small previews. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.16 — F16: Document runnable examples, stable identity and remaining platform limits
+
+- Implementation: Replace obsolete setup/refresh claims, add phase/remote examples and clarify screen-monitor relationships, connection configuration, versioning and preview sampling; map every original TODO to its implementation.
+- Review: Cross-checked public method names, uv local-client installation, resolution reset behavior and measured-vs-unverified claims. Future >8-bit/REST features remain outside the agreed scope.
+- Testing: Examples use actual client APIs and float32 patterns; full tests verify distribution versions and shared helper/API contracts. Native Windows and physical/fractional-scaling limits remain explicit. Full unittest suite and Ruff passed before commit.
