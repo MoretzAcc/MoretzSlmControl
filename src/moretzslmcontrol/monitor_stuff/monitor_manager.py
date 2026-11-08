@@ -29,6 +29,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class MonitorManager(QObject):
     recordsChanged = Signal()
     consoleChanged = Signal(str)
+    screenGeometryChanged = Signal(str)
 
     def __init__(self, app: QApplication, platform_adapter: PlatformAdapter) -> None:
         super().__init__()
@@ -37,6 +38,7 @@ class MonitorManager(QObject):
         self._records_by_id: dict[str, ScreenRecord] = {}
         self._sessions_by_id: dict[str, DisplaySession] = {}
         self._known_screens: dict[str, QScreen] = {}
+        self._observed_screens: set[QScreen] = set()
         self._console_entries_by_id: dict[str, deque[tuple[str, str, str]]] = {}
 
         self._app.screenAdded.connect(self._on_screen_added)
@@ -46,6 +48,11 @@ class MonitorManager(QObject):
     def rescan_screens(self) -> None:
         current_ids: set[str] = set()
         for screen in self._app.screens():
+            if screen not in self._observed_screens:
+                screen.geometryChanged.connect(self._on_screen_geometry_changed)
+                screen.logicalDotsPerInchChanged.connect(self._on_screen_geometry_changed)
+                screen.physicalDotsPerInchChanged.connect(self._on_screen_geometry_changed)
+                self._observed_screens.add(screen)
             descriptor = self._platform_adapter.describe_screen(screen)
             if descriptor.screen_uid in current_ids:
                 logger.error("Duplicate screen identity %s for %s; refusing to overwrite another screen", descriptor.screen_uid, screen.name())
@@ -85,11 +92,18 @@ class MonitorManager(QObject):
                 record.height = descriptor.height
                 record.geometry_x = descriptor.geometry_x
                 record.geometry_y = descriptor.geometry_y
+                record.physical_size_x = descriptor.physical_size_x
+                record.physical_size_y = descriptor.physical_size_y
+                record.refresh_rate = descriptor.refresh_rate
                 record.associated_monitors = descriptor.associated_monitors
                 record.is_connected = True
 
             session = self._sessions_by_id.get(descriptor.screen_uid)
             if session is not None:
+                if session.displayer.shape != (descriptor.height, descriptor.width):
+                    self.screenGeometryChanged.emit(descriptor.screen_uid)
+                    session.displayer.resize(descriptor.height, descriptor.width)
+                    self.write_to_console(descriptor.screen_uid, "Output resolution changed; pixel patterns and calculation settings reset.", "warning")
                 session.attach_screen(screen)
 
         for screen_uid, record in self._records_by_id.items():
@@ -261,12 +275,16 @@ class MonitorManager(QObject):
                 views.append(session.build_debug_view())
         return views
 
+    def _on_screen_geometry_changed(self, *_: object) -> None:
+        self.rescan_screens()
+
     def _on_screen_added(self, screen: QScreen) -> None:
         descriptor = self._platform_adapter.describe_screen(screen)
         self._known_screens[descriptor.screen_uid] = screen
         self.rescan_screens()
 
     def _on_screen_removed(self, screen: QScreen) -> None:
+        self._observed_screens.discard(screen)
         descriptor = self._platform_adapter.describe_screen(screen)
         screen_uid = descriptor.screen_uid
         record = self._records_by_id.get(screen_uid)

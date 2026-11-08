@@ -63,3 +63,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Replace squeezed four-column forms with full-width pattern tabs, metadata tabs and a scrollable detail pane; use font-relative numeric sizes, theme text colors and parameter tooltips.
 - Review: Reviewed that output geometry is independent of control layout; small windows can scroll instead of reducing numeric controls to slits.
 - Testing: Qt regression checks 1024x768 sizing and minimum field heights; native KDE UI run and screenshot saved under dev/review/fork-results. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.6 — F06: Reset native pixel buffers safely on output geometry changes
+
+- Implementation: Observe Qt geometry/DPI signals, refresh monitor metadata and resize existing sessions while preserving their identity/HERO. Clear pixel patterns/grid and invalidate UI jobs with an explicit console warning.
+- Review: Reviewed revision monotonicity, session retention, positive dimensions and stale-job invalidation. Resolution changes intentionally reset pixel-dependent content rather than silently stretching it.
+- Testing: Regression checks native buffer/frame shapes, cleared patterns/grid, unchanged connector identity and monotonic revisions. Real mode/hotplug matrix is rerun in F17. Full unittest suite and Ruff passed before commit.

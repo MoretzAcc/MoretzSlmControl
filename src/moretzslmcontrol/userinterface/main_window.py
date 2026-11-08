@@ -116,6 +116,7 @@ class MainWindow(QMainWindow):
         self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
         self._monitor_manager.consoleChanged.connect(self._on_console_changed)
+        self._monitor_manager.screenGeometryChanged.connect(self._discard_session_state)
         self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")

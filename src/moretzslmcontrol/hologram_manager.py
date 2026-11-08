@@ -83,6 +83,19 @@ class HologramManager:
         report_progress("Registering HERO")
         self.heroConnector = SlmHeroConnector(self, self.herosName, display_name) # TODO make this toggleable somehow
 
+    def resize(self, height: int, width: int) -> None:
+        """Reset pixel-dependent state after a native output resolution change."""
+        if height <= 0 or width <= 0:
+            raise ValueError("Output dimensions must be positive")
+        with self._lock:
+            self.shape = (height, width)
+            for name in ("_correctionPattern", "_hologramPattern", "_zernikePattern", "_modificationPattern", "_totalPattern"):
+                setattr(self, name, np.zeros(self.shape, dtype=np.float32))
+            self._zernike_cart_grid = None
+            self._zernike_aberrations = dict.fromkeys(self._zernike_aberrations, 0.0)
+            self._latestFrame = np.full(self.shape, 128, dtype=np.uint8)
+        self.publishCurrentPattern()
+
     def enableSlmWindow(self, value: bool = True) -> None:
         """Request an explicit SLM output-window state on the GUI thread."""
         self._bridge.request_slm_window_enable(value)
