@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import os
+from threading import Event
+import time
+import unittest
+from unittest.mock import Mock
+
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+
+from PySide6.QtWidgets import QApplication
+from moretzslmcontrol.userinterface.main_window import MainWindow
+
+
+class CalculationSchedulingTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        self.manager = Mock()
+        self.manager.iter_debug_views.return_value = []
+        self.window = MainWindow(self.manager)
+        self.release = Event()
+
+    def tearDown(self) -> None:
+        self.release.set()
+        self.window._pattern_executor.shutdown(wait=True)
+        self.app.processEvents()
+        self.window.close()
+
+    def drain(self, predicate: object) -> None:
+        end = time.monotonic() + 3
+        while not predicate() and time.monotonic() < end:
+            self.app.processEvents()
+            time.sleep(0.001)
+        self.assertTrue(predicate())
+
+    def test_zernike_only_runs_first_and_latest_request(self) -> None:
+        entered = Event()
+        calls = []
+        def calculate(value: int) -> tuple[None, None, dict[str, int]]:
+            calls.append(value)
+            entered.set()
+            self.release.wait(3)
+            return None, None, {'defocus': value}
+        self.window._start_pattern_calculation('screen', 'zernike', (0,), calculate, 0)
+        self.assertTrue(entered.wait(1))
+        for value in range(1, 7):
+            self.window._start_pattern_calculation('screen', 'zernike', (value,), calculate, value)
+        self.assertEqual(self.window._pattern_executor._work_queue.qsize(), 0)
+        self.release.set()
+        self.drain(lambda: not self.window._pending_pattern_calculations)
+        self.assertEqual(calls, [0, 6])
+        self.assertEqual(self.window._last_zernike_parameters['screen'], (6,))
+        self.assertEqual(self.manager.ensure_displayer.return_value.setComputedZernikePattern.call_count, 1)
+
+    def test_return_to_applied_value_invalidates_inflight_result(self) -> None:
+        self.window._selected_screen_uid = lambda: 'screen'
+        display = self.manager.ensure_displayer.return_value
+        display.shape = (8, 8)
+        display.getZernikeCartGridIfAvailable.return_value = None
+        fields = self.window._zernike_parameter_fields
+        initial = tuple(float(f.text()) for f in fields.values())
+        self.window._last_zernike_parameters['screen'] = initial
+        def calculate(aberrations: dict[str, float], *_: object) -> tuple[None, None, dict[str, float]]:
+            self.release.wait(3)
+            return None, None, aberrations
+        self.window._calculate_zernike_pattern = calculate
+        fields['defocus'].setText('0.9')
+        self.window._update_zernike_pattern()
+        fields['defocus'].setText('0')
+        self.window._update_zernike_pattern()
+        # Avoid preview rendering; this test checks actual scheduling and application calls.
+        self.window._selected_screen_uid = lambda: None
+        self.release.set()
+        self.drain(lambda: not self.window._pending_pattern_calculations)
+        self.assertEqual(display.setComputedZernikePattern.call_args.args[1]['defocus'], 0)

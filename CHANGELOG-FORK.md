@@ -39,3 +39,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Use stable connector fallback IDs, deterministic EDID ordering, and refuse duplicate record overwrites.
 - Review: Verified geometry/DPR changes do not change a connector UID; EDID-backed identities preserve their existing inputs.
 - Testing: Regression covers distinct missing-EDID connectors and stable IDs across mode/position/DPR changes. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.2 — F02: Coalesce Zernike work and reject obsolete desired states
+
+- Implementation: Keep one running job and one replaceable latest snapshot per screen; invalidate a job even when returning to the applied value; discard queued work on reset/close.
+- Review: Reviewed thread/Qt boundaries, stale revisions, reset generations and completion ordering. The original frame stays visible until the newest result is accepted.
+- Testing: Deterministic event-gated Qt regressions prove first/latest-only execution and A-B-A correctness without timing assumptions. Full unittest suite and Ruff passed before commit.

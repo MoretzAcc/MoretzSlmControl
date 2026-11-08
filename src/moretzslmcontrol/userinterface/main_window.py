@@ -105,6 +105,9 @@ class MainWindow(QMainWindow):
         self._calculation_status_labels: dict[str, QLabel] = {}
         self._pattern_calculation_revisions: dict[tuple[str, str], int] = {}
         self._pending_pattern_calculations: set[tuple[str, str]] = set()
+        self._running_pattern_calculations: set[tuple[str, str]] = set()
+        self._queued_pattern_calculations: dict[tuple[str, str], tuple[Any, ...]] = {}
+        self._closing = False
         self._pattern_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pattern-calculation")
         self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
@@ -168,6 +171,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
+        self._closing = True
+        self._queued_pattern_calculations.clear()
         self._pattern_executor.shutdown(wait=False, cancel_futures=True)
         if self._on_close_requested is not None:
             self._on_close_requested()
@@ -1124,7 +1129,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = tuple(aberrations.values())
-        if self._last_zernike_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "zernike"
+        if (self._last_zernike_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1156,6 +1164,19 @@ class MainWindow(QMainWindow):
         self._pattern_calculation_revisions[key] = revision
         self._pending_pattern_calculations.add(key)
         self._refresh_calculation_status()
+        request = (revision, parameters, calculation, arguments)
+        if component == "zernike":
+            if key in self._running_pattern_calculations:
+                self._queued_pattern_calculations[key] = request
+                return
+            self._submit_pattern_calculation(screen_uid, component, request)
+        else:
+            self._submit_pattern_calculation(screen_uid, component, request)
+
+    def _submit_pattern_calculation(self, screen_uid: str, component: str, request: tuple[Any, ...]) -> None:
+        revision, parameters, calculation, arguments = request
+        if component == "zernike":
+            self._running_pattern_calculations.add((screen_uid, component))
         future = self._pattern_executor.submit(calculation, *arguments)
         future.add_done_callback(
             lambda completed, uid=screen_uid, kind=component, request_revision=revision, request_parameters=parameters: self._report_pattern_calculation(
@@ -1175,7 +1196,8 @@ class MainWindow(QMainWindow):
             result: object = future.result()
         except Exception as error:
             result = error
-        self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
+        if not self._closing:
+            self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
 
     @staticmethod
     def _calculate_modification_pattern(
@@ -1221,7 +1243,12 @@ class MainWindow(QMainWindow):
         revision: int,
         payload: object,
     ) -> None:
-        if self._pattern_calculation_revisions.get((screen_uid, component)) != revision:
+        key = screen_uid, component
+        self._running_pattern_calculations.discard(key)
+        queued = self._queued_pattern_calculations.pop(key, None)
+        if queued is not None and not self._closing:
+            self._submit_pattern_calculation(screen_uid, component, queued)
+        if self._closing or self._pattern_calculation_revisions.get(key) != revision:
             return
         self._pending_pattern_calculations.discard((screen_uid, component))
         self._refresh_calculation_status()
@@ -1526,6 +1553,7 @@ class MainWindow(QMainWindow):
             key = screen_uid, component
             self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
             self._pending_pattern_calculations.discard(key)
+            self._queued_pattern_calculations.pop(key, None)
         self._refresh_calculation_status()
 
     def _selected_screen_uid(self) -> str | None:
