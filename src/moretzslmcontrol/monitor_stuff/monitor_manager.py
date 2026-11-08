@@ -289,21 +289,21 @@ class MonitorManager(QObject):
     def _on_screen_geometry_changed(self, *_: object) -> None:
         self.rescan_screens()
 
-    def _on_screen_added(self, screen: QScreen) -> None:
-        descriptor = self._platform_adapter.describe_screen(screen)
-        self._known_screens[descriptor.screen_uid] = screen
+    def _on_screen_added(self, _screen: QScreen) -> None:
         self.rescan_screens()
 
     def _on_screen_removed(self, screen: QScreen) -> None:
         self._observed_screens.discard(screen)
-        descriptor = self._platform_adapter.describe_screen(screen)
-        screen_uid = descriptor.screen_uid
-        record = self._records_by_id.get(screen_uid)
-        if record is not None:
-            record.is_connected = False
-        self._known_screens.pop(screen_uid, None)
-        session = self._sessions_by_id.get(screen_uid)
-        if session is not None:
-            session.detach_screen()
+        # EDID may already be unavailable at unplug time. Use the previously observed
+        # object-to-identity mapping instead of inventing a new fallback identity.
+        identities = [uid for uid, known in self._known_screens.items() if known is screen]
+        for screen_uid in identities:
+            record = self._records_by_id.get(screen_uid)
+            if record is not None:
+                record.is_connected = False
+            self._known_screens.pop(screen_uid, None)
+            session = self._sessions_by_id.get(screen_uid)
+            if session is not None:
+                session.detach_screen()
         self.recordsChanged.emit()
 logger = logging.getLogger(__name__)

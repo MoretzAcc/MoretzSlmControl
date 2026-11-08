@@ -135,3 +135,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Extend the real-Qt matrix for explicit tab navigation, three independent sessions, secondary-only reconnect and HEROS v1/v2 migration; preserve historical evidence and save current screenshots separately.
 - Review: Reviewed every scenario for failed expectations/exceptions, checked actual native geometry/focus and matched documentation to measured evidence. The runner now fails on a failed expectation, exception or Ruff check.
 - Testing: 123/123 integration expectations pass plus native KDE discovery/layout. 37 regressions, repository/client Ruff and both wheel/sdist builds pass. Windows visual, physical SLM and fractional-scaling validation remain explicitly limited. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.18 — F06a: Preserve observed monitor identity when EDID disappears during unplug
+
+- Implementation: Resolve removal callbacks from the existing QScreen-to-UID mapping rather than querying EDID after disconnect; avoid redundant identity probes during screen addition.
+- Review: Follow-up review covered physical-monitor timing beyond the no-EDID dummy case. Previously detected EDID identities now detach their original session even when EDID can no longer be read.
+- Testing: Regression deliberately makes EDID lookup unavailable during removal and verifies the original record/session is detached without querying it. Existing geometry matrix behavior remains unchanged. Full unittest suite and Ruff passed before commit.

@@ -4,7 +4,7 @@ This is the current fork result, separate from the historical upstream [review](
 
 ## Current outcomes
 
-- **37 unit/regression tests pass**, including deterministic coalescing, cached-value reversal, reset invalidation, live slider text, readable small-window fields, configuration versions/connection lifetime, monitor identity, resized native buffers, reversible flips, depth parsing and preview isolation.
+- **38 unit/regression tests pass**, including deterministic coalescing, cached-value reversal, reset invalidation, live slider text, readable small-window fields, configuration versions/connection lifetime, monitor identity, resized native buffers, reversible flips, depth parsing and preview isolation.
 - **Ruff passes** for the repository and standalone client.
 - Server and standalone client **wheels and source distributions build successfully**. The standalone client's import regression confirms it does not import Qt or server code and exits without a persistent discovery connection.
 - **123/123 integration expectations pass** across seven isolated-display scenarios. An additional native KDE run passes both discovery/layout expectations and saves dark-theme screenshots.
@@ -72,3 +72,7 @@ Notebook previews default to approximately one million pixels, preserve native c
 - The new REST API and >8-bit optical output remain the agreed future ideas, not partially implemented promises.
 
 Run [run_matrix.sh](run_matrix.sh) after starting the isolated display described in [README.md](README.md). The runner preserves baseline evidence and now fails on any failed expectation or scenario exception.
+
+## Disconnect identity follow-up
+
+Review after the full matrix identified that physical EDID can disappear before a removal callback. F06a uses the already observed QScreen-to-UID mapping instead of reading a new identity during unplug. A regression verifies that the original record/session is detached without querying unavailable EDID. The existing no-EDID matrix is unaffected; the final regression suite has 38 tests.

@@ -41,3 +41,21 @@ class MonitorIdentityTest(unittest.TestCase):
         window.activateWindow.assert_not_called()
         window.showFullScreen.assert_called_once()
         window.setGeometry.assert_called_once_with(QRect(1920, 0, 1080, 1920))
+
+    def test_unplug_keeps_previously_observed_identity_when_edid_disappears(self) -> None:
+        from moretzslmcontrol.monitor_stuff.monitor_manager import MonitorManager
+        app = Mock()
+        app.screens.return_value = []
+        adapter = Mock()
+        adapter.describe_screen.side_effect = AssertionError('EDID unavailable during removal')
+        manager = MonitorManager(app, adapter)
+        screen = Mock()
+        record, session = Mock(), Mock()
+        manager._known_screens['existing-edid-id'] = screen
+        manager._records_by_id['existing-edid-id'] = record
+        manager._sessions_by_id['existing-edid-id'] = session
+        manager._on_screen_removed(screen)
+        self.assertFalse(record.is_connected)
+        session.detach_screen.assert_called_once()
+        self.assertNotIn('existing-edid-id', manager._known_screens)
+        adapter.describe_screen.assert_not_called()
