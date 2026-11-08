@@ -1,0 +1,58 @@
+2026-11-08 10:14:54,802 [INFO] moretzslmcontrol.monitor_stuff.platform [__init__.py:22 create_platform_adapter]: Detected Platform: linux
+2026-11-08 10:14:54,803 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY0
+distinct records for each Qt screen PASS {'qt_screens': 1, 'records': 1}
+control window fits available screen PASS {'window': (0, 21, 1920, 1059), 'available': (0, 0, 1920, 1080)}
+2026-11-08 10:14:55,552 [INFO] moretzslmcontrol.hologram_manager [hologram_manager.py:52 __init__]: [] Initializing SLM DisplayerV2 with resolution: 1920x1080
+2026-11-08 10:14:55,552 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Allocating Display Buffers
+2026-11-08 10:14:55,553 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Registering HERO
+2026-11-08 10:14:55,561 [INFO] moretzslmcontrol.control.slm_hero_connector [slm_hero_connector.py:34 __init__]: [] SLM is available as a Hero with name: slm_bf84fea1__
+2026-11-08 10:14:55,561 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Creating Output Window
+allocated buffer matches selected screen PASS {'shape': [1080, 1920]}
+NPY import produces expected grayscale bytes PASS {}
+BMP import and component toggle PASS {}
+horizontal flip updates output PASS {}
+requestActivate() called for  QWidgetWindow(0x31083770, name="DisplayWindowClassWindow")  which has Qt::WindowDoesNotAcceptFocus set.
+2026-11-08 10:14:56,216 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] SLM Screen Ready
+2026-11-08 10:14:56,221 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] SLM window enabled.
+output window enabled PASS {}
+output geometry matches target PASS {'actual': (0, 0, 1920, 1080), 'target': (0, 0, 1920, 1080)}
+output pixmap has native resolution PASS {}
+output does not steal control-window focus PASS {'active': 'SLM Display Control'}
+output window disabled PASS {}
+2026-11-08 10:14:56,590 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Configuration exported to configuration.json.
+configuration export records resolution PASS {}
+2026-11-08 10:14:56,683 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Configuration imported.
+configuration import calculations complete PASS {}
+configuration roundtrip restores flip state PASS {}
+2026-11-08 10:14:57,256 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Configuration exported to configuration.json.
+2026-11-08 10:14:57,264 [INFO] moretzslmcontrol.control.slm_hero_connector [slm_hero_connector.py:34 __init__]: [] SLM is available as a Hero with name: slm_bf84fea1__
+2026-11-08 10:14:57,361 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Configuration imported.
+configuration restores disabled HEROS connection PASS {}
+2026-11-08 10:14:57,480 [INFO] moretzslmcontrol.control.slm_hero_connector [slm_hero_connector.py:34 __init__]: [] SLM is available as a Hero with name: slm_bf84fea1__
+2026-11-08 10:14:57,553 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Configuration imported.
+legacy configuration retains enabled HEROS default PASS {}
+Zernike edit applied PASS {}
+slider updates numeric text during drag PASS {'before': '0', 'during_drag': '50', 'slider_value': 50}
+modification recalculation completes PASS {}
+modification shift applied on release PASS {}
+can edit six Zernike fields while computation takes 5 seconds PASS {'edit_seconds': 0.375, 'values': ['0.1', '0.2', '0.30000000000000004', '0.4', '0.5', '0.6000000000000001']}
+updates coalesced to at most one pending calculation PASS {'queued': 0}
+latest requested Zernike values eventually applied PASS {'seconds': 10.12, 'calls': 2, 'timer_ticks': 501}
+return to cached Zernike value cancels obsolete work PASS {'requested': '0.1', 'applied': 0.1}
+can edit modification fields while computation takes 5 seconds PASS {'edit_seconds': 0.379}
+modification updates coalesced PASS {'queued': 0}
+latest modification value applied PASS {'seconds': 10.12, 'calls': 2}
+2026-11-08 10:15:28,337 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY0
+2026-11-08 10:15:28,367 [WARNING] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:217 write_to_console]: [] Output resolution changed; pixel patterns and calculation settings reset.
+2026-11-08 10:15:28,382 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY0
+2026-11-08 10:15:28,732 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY0
+record refreshes resolution after mode change PASS {'record': [800, 1280]}
+existing session buffer resizes after mode change PASS {'buffer': (800, 1280), 'previous': (1080, 1920)}
+2026-11-08 10:15:28,788 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY1
+2026-11-08 10:15:28,788 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY0
+2026-11-08 10:15:28,795 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY1
+hot-added screen gets separate record PASS {'qt_screens': 2, 'records': 2}
+2026-11-08 10:15:29,186 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:68 get_screen_edids]: Could not find EDID for connector DUMMY1
+remaining monitor record stays connected after secondary removal PASS {}
+reset releases session PASS {}
+Saved dev/review/fork-results/full-hd-slow-hotplug.json

@@ -79,5 +79,20 @@ class PatternActivationTest(unittest.TestCase):
         np.testing.assert_array_equal(exported_hologram, hologram)
 
 
+    def test_each_component_flip_roundtrips_and_rejects_invalid_controls(self) -> None:
+        original = np.arange(12, dtype=np.float32).reshape(3, 4)
+        for component in ('correction', 'hologram', 'modification'):
+            for direction, axis in (('horizontal', 1), ('vertical', 0)):
+                with self.subTest(component=component, direction=direction):
+                    setattr(self.manager, f'_{component}Pattern', original.copy())
+                    self.manager._set_pattern_flip(component, direction, True, False)
+                    np.testing.assert_array_equal(getattr(self.manager, f'_{component}Pattern'), np.flip(original, axis=axis))
+                    self.manager._set_pattern_flip(component, direction, False, False)
+                    np.testing.assert_array_equal(getattr(self.manager, f'_{component}Pattern'), original)
+        with self.assertRaises(ValueError):
+            self.manager._set_pattern_flip('unknown', 'horizontal', True, False)
+        with self.assertRaises(ValueError):
+            self.manager._set_pattern_flip('hologram', 'diagonal', True, False)
+
 if __name__ == "__main__":
     unittest.main()

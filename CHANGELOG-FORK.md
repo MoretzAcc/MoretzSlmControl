@@ -1,0 +1,167 @@
+# Fork changelog
+
+## Versioning
+
+This fork retains the complete upstream version, including its optional `.postN` suffix, and adds a PEP 440 local version: `UPSTREAM+moretzai.N`.
+
+Example: upstream `0.3.4.post2` becomes `0.3.4.post2+moretzai.1`. Each independently committed fork TODO increments N. Upstream owns the third release number and `.postN` (small follow-up fixes/documentation); the fork does not pretend its changes are upstream releases. When adopting a new upstream release, retain that new upstream version and restart the fork counter at 1. Server and standalone client versions stay synchronized through `VERSION` and `dev/sync_version.py`. Local versions are intended for Git/local installation, not publication to public PyPI.
+
+Every TODO entry records implementation, review, and actual validation. Windows-only behavior and physical SLM capabilities must be distinguished from Linux/simulated validation. Future ideas (>8-bit optical output and an additional REST API) remain separate unless explicitly brought into scope.
+
+## Work items
+
+- F01: Missing-EDID screen identity and collision protection.
+- F02: Coalesced Zernike calculations, latest desired state, stale-result invalidation.
+- F03: Coalesced modification calculations.
+- F04: Immediate slider text feedback, including wheel/keyboard.
+- F05: Responsive, readable UI and input/status feedback.
+- F06: Resolution/DPR-change lifecycle and stable reconnects.
+- F07: Output focus preservation.
+- F08: Windows Aero Peek exclusion.
+- F09: Output enable/disable action design.
+- F10: Toggleable HEROS connection, configuration persistence.
+- F11: Deduplicate standalone client/server helpers without GUI dependencies.
+- F12: Faster plotting/previews and measured validation.
+- F13: Simplify pattern-flip handling.
+- F14: Display bit-depth support and truthful capability warnings.
+- F15: Replace crossed-out previews with Off overlays.
+- F16: Examples, identity/monitor terminology, refresh/scaling documentation and TODO disposition.
+- F17: Final integration matrix, screenshots, and updated review.
+
+## 0.3.4.post2+moretzai.0 — Review baseline
+
+- Implementation: Preserve the initial review, screenshots, dummy-monitor lab and reproducible defects; establish fork versioning and individual work-item tracking.
+- Review: Production application source remains unchanged; historical results retain failing expectations rather than claiming fixes.
+- Testing: Initial 15 unit tests and Ruff pass; baseline real-Qt matrix documents layout, queue, stale-state, identity, focus and mode-change defects.
+
+## 0.3.4.post2+moretzai.1 — F01: Keep missing-EDID monitor identities distinct
+
+- Implementation: Use stable connector fallback IDs, deterministic EDID ordering, and refuse duplicate record overwrites.
+- Review: Verified geometry/DPR changes do not change a connector UID; EDID-backed identities preserve their existing inputs.
+- Testing: Regression covers distinct missing-EDID connectors and stable IDs across mode/position/DPR changes. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.2 — F02: Coalesce Zernike work and reject obsolete desired states
+
+- Implementation: Keep one running job and one replaceable latest snapshot per screen; invalidate a job even when returning to the applied value; discard queued work on reset/close.
+- Review: Reviewed thread/Qt boundaries, stale revisions, reset generations and completion ordering. The original frame stays visible until the newest result is accepted.
+- Testing: Deterministic event-gated Qt regressions prove first/latest-only execution and A-B-A correctness without timing assumptions. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.3 — F03: Coalesce modification calculations with independent component state
+
+- Implementation: Apply the latest-snapshot scheduler to modification work, including return-to-applied requests; keep screen/component queues separate.
+- Review: Reviewed shared completion flow and generation invalidation; reset cannot recreate a session from a late result.
+- Testing: Event-gated regressions verify bounded modification work, newest-only application and reset invalidation. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.4 — F04: Show slider values immediately and debounce non-drag edits
+
+- Implementation: Update numeric text on every slider value change; calculate on drag release and debounce keyboard/wheel changes; stop timers when switching screens.
+- Review: Reviewed that text feedback performs no pattern work and programmatic blocked updates do not schedule calculations.
+- Testing: Qt regressions verify live drag text, release-only computation and debounced non-drag changes. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.5 — F05: Make pattern controls readable in scrollable responsive sections
+
+- Implementation: Replace squeezed four-column forms with full-width pattern tabs, metadata tabs and a scrollable detail pane; use font-relative numeric sizes, theme text colors and parameter tooltips.
+- Review: Reviewed that output geometry is independent of control layout; small windows can scroll instead of reducing numeric controls to slits.
+- Testing: Qt regression checks 1024x768 sizing and minimum field heights; native KDE UI run and screenshot saved under dev/review/fork-results. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.6 — F06: Reset native pixel buffers safely on output geometry changes
+
+- Implementation: Observe Qt geometry/DPI signals, refresh monitor metadata and resize existing sessions while preserving their identity/HERO. Clear pixel patterns/grid and invalidate UI jobs with an explicit console warning.
+- Review: Reviewed revision monotonicity, session retention, positive dimensions and stale-job invalidation. Resolution changes intentionally reset pixel-dependent content rather than silently stretching it.
+- Testing: Regression checks native buffer/frame shapes, cleared patterns/grid, unchanged connector identity and monotonic revisions. Real mode/hotplug matrix is rerun in F17. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.7 — F07: Keep keyboard focus in the control window during SLM output
+
+- Implementation: Show output without activation or keyboard focus; remove activation on attach and repeated frame refresh.
+- Review: Reviewed fullscreen placement, stacking and mouse exit controls; they remain available without keyboard activation.
+- Testing: Platform regression rejects activation requests and checks target geometry/fullscreen calls. Live focus validation follows in F17. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.8 — F08: Exclude Windows SLM windows from Aero Peek
+
+- Implementation: Apply DWM DISALLOW_PEEK and EXCLUDED_FROM_PEEK after native fullscreen creation; report unavailable/failed DWM attributes without crashing.
+- Review: Checked Microsoft DWM API semantics, pointer-sized HWND, four-byte BOOL and HRESULT handling. This Linux VM cannot validate the Windows compositor visually.
+- Testing: Mocked native-call regressions cover both attributes, 64-bit handles, BOOL width and failure reporting. Real Windows/Aero Peek validation remains explicitly pending. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.9 — F09: Separate output state from the enable-disable action
+
+- Implementation: Replace alarm-red/blue styling with a theme-native checkable action and explicit On/Off/Disconnected status; prevent enabling a disconnected output.
+- Review: Reviewed repeated state refreshes for unintended clicks and preserved access to disabling disconnected active sessions.
+- Testing: Qt regression checks action text, checked state, disconnected status and enablement. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.10 — F10: Make HEROS connections optional and persist the preference
+
+- Implementation: Add per-screen external-control toggles without forcing session creation; unregister/re-register HERO while retaining frames; export connection state in configuration v2 and read v1 files.
+- Review: Reviewed connector lifetime, idempotent toggling, disabled-session initialization and API compatibility. Legacy configurations retain the previous enabled default.
+- Testing: Regressions cover disabled startup, repeated toggles, preserved frames, reconnect, and v1/v2 configuration loading; client/server contract tests remain green. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.11 — F11: Share numerical and file helpers through the independent client package
+
+- Implementation: Canonicalize NPY/BMP and phase helpers in the independent client; synchronize the server dependency; perform discovery on demand with scoped network cleanup.
+- Review: Reviewed dependency direction and corrected an import-time HEROObserver that kept standalone numerical-helper processes alive; no GUI/server dependency is introduced into the client.
+- Testing: All 256 byte values roundtrip; server/client helpers share implementation; subprocess verifies client-only imports exit without a persistent session or Qt/server imports. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.12 — F12: Bound GUI and notebook preview work before copying pixels
+
+- Implementation: Sample GUI arrays under the data lock before copying; cap notebook preview pixels while preserving native coordinate extent and full-resolution opt-out.
+- Review: Reviewed native frame/API/export paths: only visual previews are sampled. Sampling includes image edges, preserves aspect ratio and does not modify source arrays.
+- Testing: Tests cover bounded allocation, source isolation, edge samples and notebook extents/full-resolution opt-out. 4K copy/sample benchmark is stored in fork-results/F12-preview-benchmark.json. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.13 — F13: Make flip state transitions explicit and validate controls
+
+- Implementation: Replace synthesized attribute-name spelling with explicit component/flag mappings and one axis-based flip operation.
+- Review: Reviewed atomic pattern/flag/inclusion changes under the existing lock; reversible flips and current inclusion/export semantics are preserved.
+- Testing: Regression exercises both axes for all three supported components, roundtrip restoration and rejection of unsupported component/direction values. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.14 — F14: Display truthful output depth and warn about higher monitor capability
+
+- Implementation: Show 8-bit software output, EDID 1.4 input bits/channel and compatibility notes; parse validated digital EDID blocks on Linux/Windows and warn for >8-bit capability.
+- Review: Reviewed that framebuffer RGB depth, advertised input capability, active link depth and optical SLM phase precision are not conflated; absent/old/invalid EDID stays Unknown.
+- Testing: Fixtures cover every valid digital depth, reserved/analog/legacy/corrupt EDIDs and warning text. Physical >8-bit optical output and Windows hardware are not validated. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.15 — F15: Replace crossed-out previews with a translucent Off label
+
+- Implementation: Draw centered dark Off text on a partially opaque white preview-only background; retain old helper import as a compatibility alias.
+- Review: Reviewed that only bounded preview copies are painted; native buffers, configuration exports and phase composition never receive the overlay.
+- Testing: Image regressions check localized light background/dark text, unchanged source bytes, grayscale shape/dtype and very small previews. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.16 — F16: Document runnable examples, stable identity and remaining platform limits
+
+- Implementation: Replace obsolete setup/refresh claims, add phase/remote examples and clarify screen-monitor relationships, connection configuration, versioning and preview sampling; map every original TODO to its implementation.
+- Review: Cross-checked public method names, uv local-client installation, resolution reset behavior and measured-vs-unverified claims. Future >8-bit/REST features remain outside the agreed scope.
+- Testing: Examples use actual client APIs and float32 patterns; full tests verify distribution versions and shared helper/API contracts. Native Windows and physical/fractional-scaling limits remain explicit. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.17 — F17: Verify all fork TODOs on native and virtual monitor geometries
+
+- Implementation: Extend the real-Qt matrix for explicit tab navigation, three independent sessions, secondary-only reconnect and HEROS v1/v2 migration; preserve historical evidence and save current screenshots separately.
+- Review: Reviewed every scenario for failed expectations/exceptions, checked actual native geometry/focus and matched documentation to measured evidence. The runner now fails on a failed expectation, exception or Ruff check.
+- Testing: 123/123 integration expectations pass plus native KDE discovery/layout. 37 regressions, repository/client Ruff and both wheel/sdist builds pass. Windows visual, physical SLM and fractional-scaling validation remain explicitly limited. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.18 — F06a: Preserve observed monitor identity when EDID disappears during unplug
+
+- Implementation: Resolve removal callbacks from the existing QScreen-to-UID mapping rather than querying EDID after disconnect; avoid redundant identity probes during screen addition.
+- Review: Follow-up review covered physical-monitor timing beyond the no-EDID dummy case. Previously detected EDID identities now detach their original session even when EDID can no longer be read.
+- Testing: Regression deliberately makes EDID lookup unavailable during removal and verifies the original record/session is detached without querying it. Existing geometry matrix behavior remains unchanged. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.19 — F18: Process shutdown signals while the native Qt event loop is idle
+
+- Implementation: Keep a low-frequency Qt timer entering Python so the existing SIGINT/SIGTERM handlers can run even without UI input.
+- Review: Final normal-entrypoint validation reproduced delayed signal handling in an otherwise idle Qt event loop. The fix preserves the existing shutdown reason/status and targets only deferred signal delivery.
+- Testing: A subprocess regression sends external SIGTERM after readiness and requires the idle Qt loop to exit with the intended status within three seconds. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.20 — F19: Record the final native-launch and regression validation
+
+- Implementation: Update validation notes and TODO disposition with the physical-unplug identity follow-up and idle-signal fix; preserve current entrypoint/regression logs.
+- Review: Checked that the report distinguishes 123 virtual-display expectations, 39 regressions, native KDE checks and unverified Windows/physical/fractional cases. Historical baseline evidence is preserved.
+- Testing: 39 regressions and Ruff pass; actual native KDE entrypoint starts and exits on SIGTERM with status 143 within three seconds. Current unit and native-entrypoint logs are saved with the review. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.21 — F20: Validate Aero Peek in a reusable native Windows lab
+
+- Implementation: Added native production-window A/B probe, repeatable Explorer thumbnail-hover controller, screenshots and persistent Windows lab instructions; production code is unchanged.
+- Review: Verified real DWM setter results, changing reference, protected HWND identity, pixel comparisons and restoration; documented inconclusive keyboard trials and software-compositor limits.
+- Testing: Two taskbar trials passed all 10 expectations on Windows 11 LTSC build 26100; native Windows unittest ran 39 tests with 38 passed and one Unix-only skip. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.22 — F20a: Make Windows probe cleanup clicks reliable
+
+- Implementation: Send USB tablet button-down and button-up as separate QMP events with an observation interval.
+- Review: Confirmed the standalone native probe completes successfully and releases its output windows; no production code changed.
+- Testing: Repeated both native taskbar trials after a normal Windows restart: 10/10 visual expectations passed. Full unittest suite and Ruff passed before commit.

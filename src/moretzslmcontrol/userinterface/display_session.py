@@ -26,6 +26,7 @@ class DisplaySession:
         screen_record: ScreenRecord,
         platform_adapter: PlatformAdapter,
         report_progress: Callable[[str], None],
+        heros_enabled: bool = True,
     ) -> None:
         self.screen_record = screen_record
         self.session_id = screen_record.screen_uid
@@ -39,6 +40,7 @@ class DisplaySession:
             display_name=screen_record.display_name,
             bridge=self.bridge,
             report_progress=report_progress,
+            heros_enabled=heros_enabled,
         )
         self._report_progress = report_progress
         self._report_progress("Creating Output Window")

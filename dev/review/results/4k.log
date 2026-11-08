@@ -1,0 +1,24 @@
+2026-11-08 07:24:39,046 [INFO] moretzslmcontrol.monitor_stuff.platform [__init__.py:22 create_platform_adapter]: Detected Platform: linux
+2026-11-08 07:24:39,048 [ERROR] moretzslmcontrol.monitor_stuff.platform.linux [linux.py:67 get_screen_edids]: Could not find EDID for connector DUMMY0
+distinct records for each Qt screen PASS {'qt_screens': 1, 'records': 1}
+control window fits available screen PASS {'window': (0, 21, 3840, 2139), 'available': (0, 0, 3840, 2160)}
+2026-11-08 07:24:39,831 [INFO] moretzslmcontrol.hologram_manager [hologram_manager.py:50 __init__]: [] Initializing SLM DisplayerV2 with resolution: 3840x2160
+2026-11-08 07:24:39,831 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] Allocating Display Buffers
+2026-11-08 07:24:39,832 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] Registering HERO
+2026-11-08 07:24:39,841 [INFO] moretzslmcontrol.control.slm_hero_connector [slm_hero_connector.py:34 __init__]: [] SLM is available as a Hero with name: slm_bc30d2eb__
+2026-11-08 07:24:39,841 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] Creating Output Window
+allocated buffer matches selected screen PASS {'shape': [2160, 3840]}
+NPY import produces expected grayscale bytes PASS {}
+BMP import and component toggle PASS {}
+horizontal flip updates output PASS {}
+2026-11-08 07:24:41,026 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] SLM Screen Ready
+2026-11-08 07:24:41,048 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] SLM window enabled.
+output window enabled PASS {}
+output geometry matches target PASS {'actual': (0, 0, 3840, 2160), 'target': (0, 0, 3840, 2160)}
+output pixmap has native resolution PASS {}
+output does not steal control-window focus FAIL {'active': ' - bc30d2eb'}
+output window disabled PASS {}
+2026-11-08 07:24:41,608 [INFO] moretzslmcontrol.monitor_stuff.monitor_manager [monitor_manager.py:189 write_to_console]: [] Configuration exported to configuration.json.
+configuration export records resolution PASS {}
+reset releases session PASS {}
+Saved /home/rolf/projects/MoretzSlmControl/dev/review/results/4k.json

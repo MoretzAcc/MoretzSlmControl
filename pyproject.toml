@@ -1,6 +1,6 @@
 [project]
 name = "moretzslmcontrol"
-version = "0.3.4.post2"
+version = "0.3.4.post2+moretzai.22"
 description = "Display grayscale hologram patterns for phase-only spatial light modulators."
 readme = "README.md"
 authors = [
@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "moretzslmcontrol-client==0.3.4.post2+moretzai.22",
     "colorlog>=6.11.0",
     "heros>=0.13.3",
     "ipykernel>=7.3.0",
@@ -85,3 +86,6 @@ exclude = [
 [[tool.mypy.overrides]]
 module = ["heros.*", "pyedid.*", "win32*"]
 ignore_missing_imports = true
+
+[tool.uv.sources]
+moretzslmcontrol-client = { path = "client", editable = true }

@@ -26,6 +26,7 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 class MonitorEdid:
     os_identifier: str
     parsed_edid: Edid
+    bits_per_channel: int | None = None
 
 
 class PlatformAdapter(ABC):
@@ -39,7 +40,7 @@ class PlatformAdapter(ABC):
         pass
 
     def describe_screen(self, screen: QScreen) -> ScreenDescriptor:
-        edids = self.get_screen_edids(screen)
+        edids = sorted(self.get_screen_edids(screen), key=lambda edid: edid.os_identifier)
         dpr = screen.devicePixelRatio()
         geometry = screen.geometry()
         width = round(geometry.width() * dpr)
@@ -58,6 +59,9 @@ class PlatformAdapter(ABC):
                 *(f"{edid.parsed_edid.serial}" for edid in edids),
             )
         )
+        if not edids:
+            # A connector remains stable across mode changes and distinguishes virtual outputs.
+            uid_source += f"_no-edid_{screen.name().strip()}"
         screen_uid = sha256(uid_source.encode("utf-8")).hexdigest()[:8]
         descriptor = ScreenDescriptor(
             display_name=display_name,
@@ -80,6 +84,8 @@ class PlatformAdapter(ABC):
 
     def configure_display_window(self, window: QWidget) -> None:
         window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        window.setWindowFlag(Qt.WindowType.WindowDoesNotAcceptFocus, True)
+        window.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
@@ -90,7 +96,6 @@ class PlatformAdapter(ABC):
         window.setGeometry(screen.geometry())
         window.showFullScreen()
         window.raise_()
-        window.activateWindow()
 
     def detach_window_from_screen(self, window: QWidget) -> None:
         window.showNormal()
@@ -99,4 +104,3 @@ class PlatformAdapter(ABC):
     def keep_window_in_focus(self, window: QWidget) -> None:
         if window.isVisible():
             window.raise_()
-            window.activateWindow()
