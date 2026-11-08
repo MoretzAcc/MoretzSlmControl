@@ -133,3 +133,13 @@ class CalculationSchedulingTest(unittest.TestCase):
         for field in self.window._zernike_parameter_fields.values():
             self.assertGreaterEqual(field.height(), field.fontMetrics().height()*1.7)
             self.assertGreaterEqual(field.width(), 100)
+
+    def test_output_action_distinguishes_state_from_action(self) -> None:
+        from moretzslmcontrol.monitor_stuff.models import SessionState
+        self.window._update_slm_window_button(SessionState.ACTIVE_CONNECTED)
+        self.assertEqual(self.window._slm_output_status.text(), 'Output on')
+        self.assertEqual(self.window._slm_window_button.text(), 'Disable SLM output')
+        self.assertTrue(self.window._slm_window_button.isChecked())
+        self.window._update_slm_window_button(SessionState.INACTIVE_DISCONNECTED)
+        self.assertEqual(self.window._slm_output_status.text(), 'Output disconnected')
+        self.assertFalse(self.window._slm_window_button.isEnabled())

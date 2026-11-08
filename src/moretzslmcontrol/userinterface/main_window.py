@@ -204,7 +204,10 @@ class MainWindow(QMainWindow):
         self._screen_title = QLabel("Screen settings")
         self._screen_title.setStyleSheet("font-size: 20px; font-weight: 600;")
         self._slm_window_button = QPushButton()
-        self._slm_window_button.setFixedHeight(52)
+        self._slm_window_button.setMinimumHeight(36)
+        self._slm_window_button.setCheckable(True)
+        self._slm_output_status = QLabel("Output off")
+        self._slm_output_status.setAccessibleName("SLM output state")
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
@@ -243,8 +246,9 @@ class MainWindow(QMainWindow):
 
     def _build_applied_hologram_group(self) -> QGroupBox:
         group = QGroupBox("Hologram Preview")
-        group.setMinimumWidth(280)
+        group.setMinimumWidth(260)
         layout = QVBoxLayout(group)
+        layout.addWidget(self._slm_output_status)
         layout.addWidget(self._build_pattern_component(None, component_key="total"))
         return group
 
@@ -1510,16 +1514,13 @@ class MainWindow(QMainWindow):
         return "Disabled"
 
     def _update_slm_window_button(self, state: SessionState) -> None:
-        if self._is_slm_window_enabled(state):
-            self._slm_window_button.setText("SLM WINDOW ON  —  Disable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #1565c0; color: white; font-weight: 700; border-radius: 4px;"
-            )
-        else:
-            self._slm_window_button.setText("SLM WINDOW OFF  —  Enable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #b71c1c; color: white; font-weight: 700; border-radius: 4px;"
-            )
+        enabled = self._is_slm_window_enabled(state)
+        connected = state in (SessionState.INACTIVE_CONNECTED, SessionState.ACTIVE_CONNECTED)
+        self._slm_window_button.setChecked(enabled)
+        self._slm_window_button.setText("Disable SLM output" if enabled else "Enable SLM output")
+        self._slm_window_button.setEnabled(connected or enabled)
+        self._slm_window_button.setToolTip("Show or hide the native fullscreen SLM output without changing its pattern.")
+        self._slm_output_status.setText("Output on" if enabled and connected else "Output disconnected" if not connected else "Output off")
 
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:
