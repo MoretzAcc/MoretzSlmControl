@@ -1090,7 +1090,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = (x, y, z, wavelength, focal_length, magnification, pixel_pitch)
-        if self._last_modification_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "modification"
+        if (self._last_modification_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1165,18 +1168,14 @@ class MainWindow(QMainWindow):
         self._pending_pattern_calculations.add(key)
         self._refresh_calculation_status()
         request = (revision, parameters, calculation, arguments)
-        if component == "zernike":
-            if key in self._running_pattern_calculations:
-                self._queued_pattern_calculations[key] = request
-                return
-            self._submit_pattern_calculation(screen_uid, component, request)
-        else:
-            self._submit_pattern_calculation(screen_uid, component, request)
+        if key in self._running_pattern_calculations:
+            self._queued_pattern_calculations[key] = request
+            return
+        self._submit_pattern_calculation(screen_uid, component, request)
 
     def _submit_pattern_calculation(self, screen_uid: str, component: str, request: tuple[Any, ...]) -> None:
         revision, parameters, calculation, arguments = request
-        if component == "zernike":
-            self._running_pattern_calculations.add((screen_uid, component))
+        self._running_pattern_calculations.add((screen_uid, component))
         future = self._pattern_executor.submit(calculation, *arguments)
         future.add_done_callback(
             lambda completed, uid=screen_uid, kind=component, request_revision=revision, request_parameters=parameters: self._report_pattern_calculation(

@@ -45,3 +45,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Keep one running job and one replaceable latest snapshot per screen; invalidate a job even when returning to the applied value; discard queued work on reset/close.
 - Review: Reviewed thread/Qt boundaries, stale revisions, reset generations and completion ordering. The original frame stays visible until the newest result is accepted.
 - Testing: Deterministic event-gated Qt regressions prove first/latest-only execution and A-B-A correctness without timing assumptions. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.3 — F03: Coalesce modification calculations with independent component state
+
+- Implementation: Apply the latest-snapshot scheduler to modification work, including return-to-applied requests; keep screen/component queues separate.
+- Review: Reviewed shared completion flow and generation invalidation; reset cannot recreate a session from a late result.
+- Testing: Event-gated regressions verify bounded modification work, newest-only application and reset invalidation. Full unittest suite and Ruff passed before commit.

@@ -76,3 +76,29 @@ class CalculationSchedulingTest(unittest.TestCase):
         self.release.set()
         self.drain(lambda: not self.window._pending_pattern_calculations)
         self.assertEqual(display.setComputedZernikePattern.call_args.args[1]['defocus'], 0)
+
+    def test_modification_only_applies_latest_request(self) -> None:
+        entered = Event()
+        calls = []
+        def calculate(value: int) -> int:
+            calls.append(value)
+            entered.set()
+            self.release.wait(3)
+            return value
+        self.window._start_pattern_calculation('screen', 'modification', (0,), calculate, 0)
+        self.assertTrue(entered.wait(1))
+        for value in range(1, 7):
+            self.window._start_pattern_calculation('screen', 'modification', (value,), calculate, value)
+        self.assertEqual(self.window._pattern_executor._work_queue.qsize(), 0)
+        self.release.set()
+        self.drain(lambda: not self.window._pending_pattern_calculations)
+        self.assertEqual(calls, [0, 6])
+        self.manager.ensure_displayer.return_value.setModificationPattern.assert_called_once_with(6)
+
+    def test_reset_discards_queued_work_and_prevents_session_recreation(self) -> None:
+        self.window._start_pattern_calculation('screen', 'modification', (1,), self.release.wait, 3)
+        self.window._start_pattern_calculation('screen', 'modification', (2,), self.release.wait, 3)
+        self.window._discard_session_state('screen')
+        self.release.set()
+        self.drain(lambda: not self.window._running_pattern_calculations)
+        self.manager.ensure_displayer.assert_not_called()
