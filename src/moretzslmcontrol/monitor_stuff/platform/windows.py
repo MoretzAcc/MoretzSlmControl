@@ -16,6 +16,7 @@ from PySide6.QtGui import QScreen
 from moretzslmcontrol.monitor_stuff.platform import PlatformAdapter
 
 from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
+from moretzslmcontrol.monitor_stuff.platform.windows_peek import exclude_from_peek
 from moretzslmcontrol.monitor_stuff.platform.windows_edid.windows_edid import windows_match_edids
 
 
@@ -44,6 +45,11 @@ class WindowsPlatformAdapter(PlatformAdapter):
         return [
             MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid) for win_monitor in windows_match_edids(screen)
         ]
+
+    def attach_window_to_screen(self, window: QWidget, screen: QScreen) -> None:
+        super().attach_window_to_screen(window, screen)
+        if not exclude_from_peek(int(window.winId())):
+            logger.warning("Windows DWM could not exclude the SLM output from Aero Peek")
 
     def detach_window_from_screen(self, window: QWidget) -> None:
         window.showMinimized()

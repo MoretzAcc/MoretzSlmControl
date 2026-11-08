@@ -75,3 +75,9 @@ Every TODO entry records implementation, review, and actual validation. Windows-
 - Implementation: Show output without activation or keyboard focus; remove activation on attach and repeated frame refresh.
 - Review: Reviewed fullscreen placement, stacking and mouse exit controls; they remain available without keyboard activation.
 - Testing: Platform regression rejects activation requests and checks target geometry/fullscreen calls. Live focus validation follows in F17. Full unittest suite and Ruff passed before commit.
+
+## 0.3.4.post2+moretzai.8 — F08: Exclude Windows SLM windows from Aero Peek
+
+- Implementation: Apply DWM DISALLOW_PEEK and EXCLUDED_FROM_PEEK after native fullscreen creation; report unavailable/failed DWM attributes without crashing.
+- Review: Checked Microsoft DWM API semantics, pointer-sized HWND, four-byte BOOL and HRESULT handling. This Linux VM cannot validate the Windows compositor visually.
+- Testing: Mocked native-call regressions cover both attributes, 64-bit handles, BOOL width and failure reporting. Real Windows/Aero Peek validation remains explicitly pending. Full unittest suite and Ruff passed before commit.
