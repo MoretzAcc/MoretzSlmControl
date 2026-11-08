@@ -85,7 +85,10 @@ class HologramManager:
         self._latestFrame: NDArray[np.uint8] = np.full(self.shape, half_dtype_range, dtype=np.uint8)
         self._latestRevision: int = 0
         self._stats = SessionStats()
-        report_progress("Registering HERO")
+        if heros_enabled:
+            report_progress("Registering HERO")
+        else:
+            report_progress("HEROS connection disabled")
         self.setHeroEnabled(heros_enabled)
 
     def setHeroEnabled(self, enabled: bool) -> None:

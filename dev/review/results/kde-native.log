@@ -1,4 +1,0 @@
-2026-11-08 07:26:38,429 [INFO] moretzslmcontrol.monitor_stuff.platform [__init__.py:22 create_platform_adapter]: Detected Platform: linux
-distinct records for each Qt screen PASS {'qt_screens': 1, 'records': 1}
-control window fits available screen FAIL {'window': (0, 28, 1280, 780), 'available': (0, 0, 1280, 756)}
-Saved /home/rolf/projects/MoretzSlmControl/dev/review/results/kde-native.json

@@ -6,9 +6,35 @@ from unittest.mock import Mock
 from PySide6.QtCore import QRect, QSizeF
 
 from moretzslmcontrol.monitor_stuff.platform.linux import LinuxPlatformAdapter
+from moretzslmcontrol.monitor_stuff.platform.base import MonitorEdid
 
 
 class MonitorIdentityTest(unittest.TestCase):
+    def test_identical_edids_on_separate_connectors_remain_distinct(self) -> None:
+        adapter = LinuxPlatformAdapter('xcb')
+        adapter.get_host_id = Mock(return_value='test-host')
+        edid = Mock()
+        edid.manufacturer_pnp_id = 'ACM'
+        edid.name = 'Same panel'
+        edid.product_id = 1
+        edid.year = 2024
+        edid.week = 1
+        edid.serial = 'shared'
+        screen = Mock()
+        screen.devicePixelRatio.return_value = 1
+        screen.geometry.return_value = QRect(0, 0, 1920, 1080)
+        screen.physicalSize.return_value = QSizeF(500, 300)
+        screen.serialNumber.return_value = ''
+        screen.manufacturer.return_value = ''
+        screen.model.return_value = ''
+        screen.refreshRate.return_value = 60
+        screen.name.return_value = 'DP-1'
+        adapter.get_screen_edids = Mock(return_value=[MonitorEdid('DP-1', edid)])
+        first = adapter.describe_screen(screen).screen_uid
+        screen.name.return_value = 'DP-2'
+        adapter.get_screen_edids = Mock(return_value=[MonitorEdid('DP-2', edid)])
+        self.assertNotEqual(adapter.describe_screen(screen).screen_uid, first)
+
     def test_missing_edid_keeps_connectors_distinct_and_identity_stable(self) -> None:
         adapter = LinuxPlatformAdapter('xcb')
         adapter.get_screen_edids = Mock(return_value=[])

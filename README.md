@@ -23,13 +23,10 @@ Tested using Spatial Light Modulators from:
 ## Install and run
 
 ```bash
-git clone https://github.com/MoretzAccAi/MoretzSlmControl.git
-cd MoretzSlmControl
-uv sync --locked
+git pull <your preferred method of pulling>
+uv sync
 uv run moretzslmcontrol
 ```
-
-This fork installs its matching standalone client from the `client/` directory through uv. Keep both distributions together when building/installing wheels. Fork versions retain the upstream release plus `+moretzai.N`; see [CHANGELOG-FORK.md](CHANGELOG-FORK.md) for per-TODO implementation, review and validation.
 
 ## Usage
 
@@ -70,54 +67,23 @@ uv run mypy
 uv run python -m unittest discover -s tests
 ```
 
-## Pattern examples
+## Notes
 
-Create an exactly sized float32 phase ramp (dimensions are height, width):
+- The pattern coordinate origin is at the bottom left.
+- Display, Screen and Monitor are not synonymous:
+  - Display and Screen can be treated as synonymous. There are defined in Software.
+  - Monitors are the hardware connected to the PC. Through screen mirroring, multiple monitors can show the same Screen.
+- Screens and Monitors do not have a safe unique ID.
+  - This software generates a unique ID for each screen based on:
+    - Display Name
+    - Serial Numbers of all Monitors showing this screen (empty for many devices)
+    - Manufacturer Date of all Monitors showing this screen
+    - OS Identifies of all Monitors showing this screen (related to the connected Port)
+  - With this, it is impossible to have two screens with the same UID connected at the same time.
 
-```python
-import numpy as np
+## Known issues
 
-height, width = 1080, 1920  # Use the selected screen's native resolution.
-phase = np.broadcast_to(np.linspace(-np.pi, np.pi, width, endpoint=False,
-                                   dtype=np.float32), (height, width)).copy()
-np.save("ramp.npy", phase)
-```
-
-Load `ramp.npy` from the Hologram tab, toggle components, and inspect the preview before enabling the intended output. NPY inputs contain phase in radians; BMP inputs are grayscale byte values. The coordinate origin is at the bottom left. Export/import configurations preserve imported patterns and flip states; applying a different-resolution configuration prompts to import settings only.
-
-Remote access (enable the screen's HEROS connection first):
-
-```python
-from moretzslmclient import SlmHeroApi, discover_slm_heros, importNpyHologram
-
-names = discover_slm_heros()
-if not names:
-    raise RuntimeError("Enable a HEROS connection in the desktop application first")
-with SlmHeroApi(names[0]) as slm:  # Choose the intended screen explicitly in a real setup.
-    slm.setHologramPattern(importNpyHologram("ramp.npy"))
-```
-
-See [client/README.md](client/README.md) for client installation and previews.
-
-## Screens, monitors and persistent identity
-
-A screen/display is a software output. A monitor is a physical device; mirrored monitors can share one screen, so the relationship is many monitors to one screen. An output window is one native fullscreen window associated with a screen.
-
-The screen UID and derived HERO name combine the host ID and associated monitor EDID/connector identifiers, manufacture information and serials. EDIDs are sorted before hashing. On the same host, monitor and port these should remain stable across mode/position changes. Without EDID, the host and Qt connector name identify the output; changing its connector name may change the UID. Missing/duplicated serials and firmware/EDID changes limit hardware identity guarantees. Duplicate IDs are detected rather than silently overwriting another record.
-
-## Resolution, scaling and bit depth
-
-The application observes Qt screen geometry/DPI changes and supports Refresh. When native pixel dimensions change, the existing session retains its identity and connection preference but resets all pixel patterns, calculated grids and pending results, with a console warning. Reload/reapply patterns for the new dimensions; no old buffer is silently stretched. Disconnect/reconnect retains per-screen sessions and their enable state when identity remains stable.
-
-Native dimensions use Qt geometry multiplied by device pixel ratio. Integer-resolution changes are integration-tested; fractional/aggressive scaling and compositor-specific mappings still need hardware validation. Control-window layout does not define SLM pixel geometry.
-
-Software output is **8-bit grayscale (256 levels)**. The Screen tab reports digital EDID 1.4 input bits/channel where available and warns above eight bits. Advertised input depth is neither the currently active transport depth nor optical phase precision; unknown capabilities remain Unknown. Higher-bit-depth optical output is not implemented.
-
-## Testing and remaining platform limits
-
-- [Virtual monitor lab](dev/review/README.md): isolated Xorg dummy outputs, portrait/full-HD/ultrawide/4K geometries, hotplug, screenshots and five-second calculation workloads.
-- [Fork changelog](CHANGELOG-FORK.md): individual TODO changes and actual review/test evidence.
-- [Developer notes](dev/DEV_NOTES.md): completed work, remaining native-platform validation and future ideas.
-- The initial review and failing baseline are preserved under `dev/review/results/`; newer evidence is separate under `dev/review/fork-results/`.
-- Windows output requests exclusion from taskbar/desktop Aero Peek. API contracts are tested using native-call mocks on Linux; visual verification on Windows remains required.
-- Physical SLM phase response, transport precision and refresh timing are not established by virtual monitors.
+- Changing monitor settings while the application is running, such as display scaling, is not detected by refresh.
+- This software is supposed to be able to deal with OS-sided display scaling. However, for very strong (e.g. 20%, 500%) or fractional scaling (e.g. 85%), some issues may appear.
+- EDID detection is unstable on Linux. It has been tested with KDE Wayland and Ubuntu GNOME Wayland. It works in most cases, but might break for cases where multiple monitors or monitor duplication is enabled. However, a
+  fail would be noticeable immediately.

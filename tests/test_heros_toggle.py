@@ -11,9 +11,11 @@ from moretzslmcontrol.util.config_file import FORMAT_NAME, load_configuration, s
 
 class HerosToggleTest(unittest.TestCase):
     def test_disabling_external_control_preserves_patterns_and_frames(self) -> None:
+        report_progress = Mock()
         with patch('moretzslmcontrol.hologram_manager.SlmHeroConnector') as connector:
-            manager = HologramManager(4, 4, 'test', 'test', Mock(), Mock(), heros_enabled=False)
+            manager = HologramManager(4, 4, 'test', 'test', Mock(), report_progress, heros_enabled=False)
             connector.assert_not_called()
+            report_progress.assert_any_call('HEROS connection disabled')
             manager.setHologramPattern(np.ones((4, 4), dtype=np.float32))
             frame = manager.getLastFrameSnapshot()[1]
             manager.setHeroEnabled(True)
