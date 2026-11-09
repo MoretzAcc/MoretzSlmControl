@@ -1,0 +1,45 @@
+{
+  "platform": "xcb",
+  "screen": [
+    1920,
+    1080
+  ],
+  "scale": 0.8,
+  "font_before": 7.2,
+  "font_restored": 7.2,
+  "preview_sizes": {
+    "total": [
+      294,
+      73
+    ],
+    "base": [
+      301,
+      208
+    ],
+    "hologram": [
+      301,
+      208
+    ],
+    "zernike": [
+      301,
+      208
+    ],
+    "modification": [
+      301,
+      208
+    ]
+  },
+  "clipped": [],
+  "zernike_order": [
+    "defocus",
+    "primary spherical",
+    "asti 0",
+    "asti 45",
+    "coma 0",
+    "coma 90",
+    "trefoil 0",
+    "trefoil 90",
+    "asti 2nd 0",
+    "asti 2nd 45"
+  ]
+}
