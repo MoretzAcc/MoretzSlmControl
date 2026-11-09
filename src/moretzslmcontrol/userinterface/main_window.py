@@ -402,10 +402,10 @@ class MainWindow(QMainWindow):
         information_row.setSpacing(12)
         screen_information = self._build_screen_information_group()
         screen_information.setMinimumWidth(300)
-        information_row.addWidget(screen_information, 1)
+        information_row.addWidget(screen_information, 2)
         monitor_information = self._build_monitor_information_group()
         self._monitor_information_group = monitor_information
-        information_row.addWidget(monitor_information, 2)
+        information_row.addWidget(monitor_information, 1)
         applied_preview = self._build_applied_hologram_group()
         information_row.addWidget(applied_preview, 1)
         page_layout.addLayout(information_row)
