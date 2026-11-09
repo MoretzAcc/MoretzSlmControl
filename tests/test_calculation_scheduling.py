@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import tempfile
 from threading import Event
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from PySide6.QtWidgets import QApplication, QCheckBox, QScrollArea, QTabWidget
 from moretzslmcontrol.userinterface.main_window import MainWindow
+from moretzslmcontrol.util.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
 
 class CalculationSchedulingTest(unittest.TestCase):
@@ -18,9 +21,11 @@ class CalculationSchedulingTest(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
         self.manager = Mock()
         self.manager.iter_debug_views.return_value = []
-        self.window = MainWindow(self.manager)
+        self.window = MainWindow(self.manager, settings_path=Path(self.folder.name) / 'settings.json')
         self.release = Event()
 
     def tearDown(self) -> None:
@@ -149,6 +154,17 @@ class CalculationSchedulingTest(unittest.TestCase):
             self.window._change_ui_scale(0.05)
             self.window._change_ui_scale(-0.05)
         self.assertAlmostEqual(field.font().pointSizeF(), before)
+
+    def test_test_setup_ignores_and_preserves_default_user_settings(self) -> None:
+        path = Path(self.folder.name) / 'user-settings.json'
+        original = UiSettings(global_scale=3)
+        save_ui_settings(path, original)
+        with patch('moretzslmcontrol.userinterface.main_window.ui_settings_path', return_value=path):
+            case = CalculationSchedulingTest('test_ui_scale_round_trip_preserves_font_size')
+            result = unittest.TestResult()
+            case.run(result)
+        self.assertEqual(load_ui_settings(path), original)
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
 
     def test_bit_depth_is_reported_with_each_associated_monitor(self) -> None:
         self.assertFalse({"output_depth", "monitor_depth", "depth_warning"}.intersection(self.window._screen_info_fields))

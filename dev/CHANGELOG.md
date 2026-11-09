@@ -1,6 +1,26 @@
 
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Persistent UI preferences with independent global, font, element and preview factors, live settings and a restore-defaults action.
+- Optional `controls.ui` configuration export/import; older files retain current UI preferences.
+- Regression coverage for Windows EDID query failures, successful metadata refresh, UI scaling and isolated test settings.
+
+### Changed
+
+- Made the control window resizable with scrollable content and a draggable sidebar divider.
+- Centered pattern headings and previews, kept pattern controls at content height, and fitted the console below the file-pattern controls.
+- Moved Reset session to the top action row and removed redundant output-status text above the output preview.
+
+### Fixed
+
+- Windows startup continues with Qt metadata when WMI EDID queries are unsupported. Failed queries reuse the last successful EDID for an already observed screen; successful queries always refresh metadata.
+- Buttons and checkbox labels remain readable when fonts grow independently of nominal element sizes.
+- GUI tests use temporary UI settings files instead of reading or modifying personal preferences.
+
 ## 0.3.5 — 2026-11-09
 
 Reviewed changes from `master-testing`, integrated into `master` with synchronized server and client versions.

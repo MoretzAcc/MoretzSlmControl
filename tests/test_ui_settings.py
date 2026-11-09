@@ -11,7 +11,7 @@ from unittest.mock import Mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QAbstractButton, QApplication
 
 from moretzslmcontrol.userinterface.main_window import MainWindow
 from moretzslmcontrol.util.config_file import load_configuration, save_configuration
@@ -67,6 +67,9 @@ class UiScalingTest(unittest.TestCase):
         self.folder.cleanup()
 
     def test_relative_factors_are_independent_and_global_multiplies_all_three(self) -> None:
+        # Leave room for font growth so this checks nominal element scaling,
+        # independently of the minimum readable size enforced on buttons.
+        self.window._set_ui_settings(UiSettings(element_scale=2))
         field = self.window._shift_inputs["X"]
         font_size = field.font().pointSizeF()
         element_size = self.window._scale_up_button.width()
@@ -75,7 +78,7 @@ class UiScalingTest(unittest.TestCase):
         self.assertAlmostEqual(field.font().pointSizeF(), font_size * 1.5)
         self.assertEqual(self.window._scale_up_button.width(), element_size)
         self.assertEqual(self.window._preview_labels["hologram"].width(), preview_size)
-        self.window._set_ui_settings(replace(self.window._ui_settings, element_scale=1.5))
+        self.window._set_ui_settings(replace(self.window._ui_settings, element_scale=3))
         self.assertEqual(self.window._scale_up_button.width(), round(element_size * 1.5))
         self.assertEqual(self.window._preview_labels["hologram"].width(), preview_size)
         self.window._set_ui_settings(replace(self.window._ui_settings, preview_scale=0.5))
@@ -85,6 +88,17 @@ class UiScalingTest(unittest.TestCase):
         self.assertEqual(self.window._scale_up_button.width(), round(element_size * 1.5 * 0.5))
         self.assertEqual(self.window._preview_labels["hologram"].width(), round(preview_size * 0.5 * 0.5))
         self.assertEqual(load_ui_settings(self.path), self.window._ui_settings)
+
+    def test_large_fonts_keep_buttons_and_checkbox_labels_readable(self) -> None:
+        self.window._content_stack.setCurrentWidget(self.window._details_page)
+        self.window._set_ui_settings(UiSettings(font_scale=2, element_scale=0.5))
+        self.app.processEvents()
+        compact_buttons = (self.window._scale_up_button, self.window._scale_down_button, self.window._scale_settings_button)
+        for button in self.window.findChildren(QAbstractButton):
+            with self.subTest(text=button.text()):
+                self.assertGreaterEqual(button.height(), button.fontMetrics().height())
+                if button not in compact_buttons:
+                    self.assertGreaterEqual(button.width(), button.sizeHint().width())
 
     def test_modeless_dialog_updates_immediately_and_sidebar_stays_synchronized(self) -> None:
         self.window._show_ui_settings()

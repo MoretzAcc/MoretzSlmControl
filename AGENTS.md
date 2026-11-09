@@ -80,10 +80,7 @@ For code changes, use the lightest verification that matches the risk:
 - If adding tests later, place them in a standard `tests/` directory and update this file.
 - If README gains authoritative setup or usage instructions, keep this file aligned with it.
 
-## Windows fork review
+## UI preferences
 
-- Native Windows review commands and limitations are documented in `dev/windows-review/README.md`.
-- Findings and recorded evidence are in `dev/windows-review/REVIEW.md` and its `results/` directory.
-- Keep outstanding review checks failing until the underlying behavior is fixed; do not hide failed historical evidence.
-- Fork releases use the full upstream version plus `+moretzai.N`. Synchronize VERSION, server/client metadata and both lockfiles; record changes in CHANGELOG-FORK.md.
 - UI preferences live in `~/.config/moretzslmcontrol/settings.json`. Keep global and relative font/element/preview factors independent; UI scaling must never change native SLM buffers or output bytes. Configuration v2 optionally exports these factors as `controls.ui`; legacy files retain current preferences.
+- GUI tests must pass a temporary `settings_path` to MainWindow so they cannot read or overwrite personal UI preferences.

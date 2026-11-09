@@ -37,6 +37,3 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Local native Windows review runs (curated evidence is tracked separately)
-dev/windows-review/local-results/

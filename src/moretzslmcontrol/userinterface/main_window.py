@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, QTimer, Signal, Slot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize
 from sys import platform
 
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap, QShortcut, QKeySequence, QFont
@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSizePolicy,
+    QStyle,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -295,11 +296,24 @@ class MainWindow(QMainWindow):
             if widget in numeric_fields:
                 minimum_height = max(minimum_height, ceil(widget.fontMetrics().height() * 1.8))
             minimum_width = base_size.width() if widget is self._sidebar_scroll else round(base_size.width() * element_scale)
+            maximum_width = round(maximum.width() * element_scale) if maximum.width() < 16777215 else 16777215
+            maximum_height = round(maximum.height() * element_scale) if maximum.height() < 16777215 else 16777215
+            if isinstance(widget, QAbstractButton):
+                hint = widget.sizeHint()
+                if widget in (self._scale_up_button, self._scale_down_button, self._scale_settings_button):
+                    metrics = widget.fontMetrics()
+                    style = widget.style()
+                    padding = style.pixelMetric(QStyle.PixelMetric.PM_ButtonMargin, None, widget)
+                    padding += 2 * style.pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, None, widget)
+                    hint = QSize(metrics.horizontalAdvance(widget.text()) + padding, max(metrics.height() + padding, hint.height()))
+                # Font size is independent of element size; never clip text to
+                # the nominal scaled bounds, including fixed-size buttons.
+                minimum_width = max(minimum_width, hint.width())
+                minimum_height = max(minimum_height, hint.height())
+                maximum_width = max(maximum_width, minimum_width)
+                maximum_height = max(maximum_height, minimum_height)
             widget.setMinimumSize(minimum_width, minimum_height)
-            widget.setMaximumSize(
-                round(maximum.width() * element_scale) if maximum.width() < 16777215 else 16777215,
-                round(maximum.height() * element_scale) if maximum.height() < 16777215 else 16777215,
-            )
+            widget.setMaximumSize(maximum_width, maximum_height)
         for child_layout, (margins, spacing) in self._base_layout_metrics.items():
             child_layout.setContentsMargins(
                 round(margins.left() * element_scale),

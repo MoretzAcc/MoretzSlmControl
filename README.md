@@ -43,7 +43,8 @@ UI preferences are saved automatically to `~/.config/moretzslmcontrol/settings.j
 startup. A missing file is created with default values; invalid settings are backed
 up before defaults are written. **Restore Defaults** in UI settings resets all four
 factors to 100%. Scaling changes previews and controls, preserving native SLM output
-dimensions and pattern data.
+dimensions and pattern data. Buttons and checkboxes keep a minimum size that fits
+their text when the font factor is larger than the element factor.
 
 Drag the divider beside **Screens** to resize the sidebar. UI scaling preserves
 the sidebar width; its contents scroll if they need more room.

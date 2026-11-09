@@ -28,12 +28,21 @@ uv run python -m unittest discover -s tests
 - Added geometry/DPI change handling and session resizing. A changed output resolution resets patterns and optical parameters; unchanged geometry retains the current session.
 - Retained HEROS connection functionality and configuration support while removing the unstable connection toggle from the UI.
 
+## Unreleased changes
+
+- UI scaling preferences persist per user and optionally in exported configuration. Controls have a font-dependent minimum size; native SLM dimensions and pattern data are independent of UI scaling.
+- The control window is resizable, its content can scroll, and the sidebar divider is draggable. The console fits into the space below Correction and Hologram without contributing size hints to the pattern layout.
+- Windows WMI query failures use Qt metadata if no EDID was previously observed. A failure for an already observed screen reuses its last successful EDID; successful queries continue to refresh metadata and detect replaced monitors.
+- The distribution remains at 0.3.5 until the next release version is chosen; pending changes are listed in the Unreleased changelog.
+
 ## Open tasks
 
 - Improve the current overlap between the Enable SLM output button and the output preview. Scaling down the preview is undesirable here, so an overlap can be a reasonable solution; the current implementation of that overlap needs improvement. Leave the UI unchanged until this design is revisited.
 - Stabilize the HEROS connection toggle before exposing it in the user interface again.
 - Consider a warning when a monitor reports more than 8 bits per channel. The value is displayed, but the software output remains 8-bit and currently has no such warning.
 - Add more end-to-end usage examples; existing client examples are in [client/src/examples](../client/src/examples).
+- Investigate intermittent Windows hotplug recovery reported during VM testing: an enabled output sometimes needs Refresh to reconnect. This is not fixed by the WMI fallback. Confirm on physical displays before changing topology handling.
+- Distinguish identical monitor names in the sidebar with a connector or short screen identifier.
 
 ## Known limitations and validation needs
 
