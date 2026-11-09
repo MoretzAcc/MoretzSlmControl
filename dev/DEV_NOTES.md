@@ -11,7 +11,7 @@ uv run python -m unittest discover -s tests
 ## Release preparation
 
 - Version 0.3.6 integrates the reviewed PR #3 changes into `master`. Server and client distribution versions are synchronized.
-- Release notes are recorded in the [changelog](CHANGELOG.md). Collect subsequent changes in a new Unreleased section until the next version is chosen.
+- The next planned release is 0.3.6.post1. Concise release notes are recorded in the [changelog](CHANGELOG.md); implementation details and the full history are kept in the [detailed changelog](CHANGELOG_FULL.md). The distribution version remains 0.3.6 until the release bump.
 - The current distribution version is recorded in `VERSION`. Historical changelog entries contain version labels that do not consistently match it; do not derive the next version from those labels alone.
 - At release time, update `VERSION`, run `uv run python dev/sync_version.py`, and verify the resulting package metadata.
 - Release validation commands are listed above. Offscreen checks cannot validate focus, compositor behavior, output fidelity, or native monitor discovery; record native desktop and physical SLM checks separately when performed.
@@ -44,9 +44,11 @@ uv run python -m unittest discover -s tests
 - Investigate intermittent Windows hotplug recovery reported during VM testing: an enabled output sometimes needs Refresh to reconnect. This is not fixed by the WMI fallback. Confirm on physical displays before changing topology handling.
 - Distinguish identical monitor names in the sidebar with a connector or short screen identifier.
 
-## Unreleased fixes
+## Planned for 0.3.6.post1
 
 - The notched Pattern composition frame renders native Qt group-box sections and lets the active style position and paint its title. Rendering comparisons cover the locally available Windows and Fusion styles, larger fonts, and 100%/150%/200% display scaling; native Windows desktop rendering still needs verification.
+
+- Default Slider max shift is 100 µm instead of 200 µm; saved configuration values remain unchanged.
 
 ## Known limitations and validation needs
 

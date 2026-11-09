@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 from threading import Thread
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import QApplication
 
 from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 from moretzslmcontrol.hologram_manager import HologramManager
+from moretzslmcontrol.monitor_stuff.models import SessionState
 from moretzslmcontrol.userinterface.display_bridge import DisplayBridge
 from moretzslmcontrol.userinterface.main_window import MainWindow
 from moretzslmcontrol.util.ui_settings import UiSettings
@@ -53,6 +55,45 @@ class RemoteParametersTest(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(self.window._zernike_parameter_fields["asti 0"].text(), "0.2")
         self.assertTrue(np.any(self.displayer.getPatternSnapshots()[2]))
+
+    def test_calculation_completion_preserves_current_edit_and_selection(self) -> None:
+        del self.window._selected_screen_uid
+        manager = self.window._monitor_manager
+        manager.iter_debug_views.return_value = [SimpleNamespace(
+            screen_uid="screen", display_name="Test screen", screen_name="Test",
+            resolution="12x8", heros_name="test", state=SessionState.INACTIVE_CONNECTED,
+        )]
+        manager.get_screen_record.return_value = None
+        manager.get_displayer.return_value = self.displayer
+        manager.ensure_displayer.return_value = self.displayer
+        manager.get_console_entries.return_value = ()
+        self.bridge.statsChanged.connect(lambda _uid: self.window.refresh_views())
+        self.window.refresh_views()
+        self.window.show()
+        self.app.processEvents()
+        field = self.window._zernike_parameter_fields["asti 45"]
+        for start, length in ((0, 5), (4, -3), (2, 0)):
+            with self.subTest(start=start, length=length):
+                field.setFocus()
+                field.setText("0.125")
+                field.setSelection(start, length)
+                self.app.processEvents()
+                before = (field.text(), field.cursorPosition(), field.selectionStart(), field.selectedText())
+                key = "screen", "zernike"
+                self.window._pattern_calculation_revisions[key] = 1
+                self.window._pending_pattern_calculations.add(key)
+                grid = self.displayer.getZernikeCartGrid()
+                self.window._on_pattern_calculation_finished(
+                    "screen", "zernike", 1,
+                    ((), (grid, np.zeros((8, 12), dtype=np.float32), {"asti 0": 0.2})),
+                )
+                self.app.processEvents()
+                self.assertIs(self.app.focusWidget(), field)
+                self.assertEqual(
+                    (field.text(), field.cursorPosition(), field.selectionStart(), field.selectedText()), before,
+                )
+        # The unfinished edit must not start a calculation during test teardown.
+        field.blockSignals(True)
 
     def test_ui_scaling_preserves_native_patterns_and_output_bytes(self) -> None:
         pattern = np.linspace(-np.pi, np.pi, 96, dtype=np.float32).reshape(8, 12)

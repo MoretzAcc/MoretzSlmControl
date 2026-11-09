@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize
+from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize, QSignalBlocker
 from sys import platform
 
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap, QShortcut, QKeySequence, QFont
@@ -242,16 +242,19 @@ class MainWindow(QMainWindow):
 
     def refresh_views(self) -> None:
         selected_screen_uid = self._selected_screen_uid()
-        self._list_widget.clear()
-        for view in self._monitor_manager.iter_debug_views():
-            item = QListWidgetItem(self._build_item_label(view))
-            item.setData(Qt.ItemDataRole.UserRole, view.screen_uid)
-            item.setToolTip(self._build_item_tooltip(view))
-            self._list_widget.addItem(item)
-            if view.screen_uid == selected_screen_uid:
-                self._list_widget.setCurrentItem(item)
-        if self._list_widget.currentItem() is None and self._list_widget.count() > 0:
-            self._list_widget.setCurrentRow(0)
+        # Do not hide the details page for the transient empty selection while
+        # rebuilding the list: that interrupts focus and active text selections.
+        with QSignalBlocker(self._list_widget):
+            self._list_widget.clear()
+            for view in self._monitor_manager.iter_debug_views():
+                item = QListWidgetItem(self._build_item_label(view))
+                item.setData(Qt.ItemDataRole.UserRole, view.screen_uid)
+                item.setToolTip(self._build_item_tooltip(view))
+                self._list_widget.addItem(item)
+                if view.screen_uid == selected_screen_uid:
+                    self._list_widget.setCurrentItem(item)
+            if self._list_widget.currentItem() is None and self._list_widget.count() > 0:
+                self._list_widget.setCurrentRow(0)
         self._update_selected_screen()
 
     def _change_ui_scale(self, delta: float) -> None:
@@ -1139,7 +1142,7 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         row.setSpacing(4)
         slider = DeferredWheelSlider(Qt.Orientation.Horizontal)
-        slider.setRange(-200, 200)
+        slider.setRange(-100, 100)
         value_input = QLineEdit("0")
         self._size_numeric_field(value_input)
         value_input.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1173,7 +1176,7 @@ class MainWindow(QMainWindow):
             (
                 "max_shift",
                 "Slider max shift",
-                "200",
+                "100",
                 "µm",
                 "Sets the X, Y, and Z slider range. It does not change the generated pattern by itself.",
             ),
