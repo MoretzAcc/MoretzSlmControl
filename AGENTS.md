@@ -79,3 +79,10 @@ For code changes, use the lightest verification that matches the risk:
 - Be explicit about GUI/runtime verification limitations in headless environments.
 - If adding tests later, place them in a standard `tests/` directory and update this file.
 - If README gains authoritative setup or usage instructions, keep this file aligned with it.
+
+## Windows fork review
+
+- Native Windows review commands and limitations are documented in `dev/windows-review/README.md`.
+- Findings and recorded evidence are in `dev/windows-review/REVIEW.md` and its `results/` directory.
+- Keep outstanding review checks failing until the underlying behavior is fixed; do not hide failed historical evidence.
+- Fork releases use the full upstream version plus `+moretzai.N`. Synchronize VERSION, server/client metadata and both lockfiles; record changes in CHANGELOG-FORK.md.
