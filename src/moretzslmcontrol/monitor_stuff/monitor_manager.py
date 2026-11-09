@@ -30,6 +30,7 @@ class MonitorManager(QObject):
     recordsChanged = Signal()
     consoleChanged = Signal(str)
     screenGeometryChanged = Signal(str)
+    parametersChanged = Signal(str, str, object)
 
     def __init__(self, app: QApplication, platform_adapter: PlatformAdapter) -> None:
         super().__init__()
@@ -189,6 +190,7 @@ class MonitorManager(QObject):
 
         session = DisplaySession(record, self._platform_adapter, report_progress, self.heros_enabled(record.screen_uid))
         session.bridge.statsChanged.connect(self._on_session_stats_changed)
+        session.bridge.parametersChanged.connect(self.parametersChanged)
         session.bridge.consoleMessage.connect(self._on_session_console_message)
         session.bridge.slmWindowEnableRequested.connect(self._on_slm_window_enable_requested)
         self._sessions_by_id[record.screen_uid] = session

@@ -23,6 +23,7 @@ from moretzslmcontrol.util.adapt_array import pixelResizeArray
 from moretzslmcontrol.util.bit_map_util import phaseToByte
 from moretzslmclient.preview import sample_phase
 from moretzslmcontrol.util.math_util import wrap_phase
+from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 
 
@@ -70,6 +71,11 @@ class HologramManager:
         self._includeZernikePattern: bool = True
         self._includeModificationPattern: bool = True
         self._zernike_cart_grid: RZern | None = None
+        self._modification_parameters = {
+            "X": 0.0, "Y": 0.0, "Z": 0.0, "wavelength": 850.0,
+            "focal_length": 20.0, "magnification": 2.0, "pixel_pitch": 8.0,
+        }
+        self._default_modification_parameters = self._modification_parameters.copy()
         self._zernike_aberrations: dict[str, float] = {
             name: 0.0 for name, (order, _azimuthal_order) in zernike_modes.items() if order <= zernike_order
         }
@@ -114,6 +120,7 @@ class HologramManager:
                 setattr(self, name, np.zeros(self.shape, dtype=np.float32))
             self._zernike_cart_grid = None
             self._zernike_aberrations = dict.fromkeys(self._zernike_aberrations, 0.0)
+            self._modification_parameters = self._default_modification_parameters.copy()
             self._latestFrame = np.full(self.shape, 128, dtype=np.uint8)
         self.publishCurrentPattern()
 
@@ -252,8 +259,43 @@ class HologramManager:
             self._zernike_aberrations = updated_aberrations
             self._zernikePattern = wrap_phase(np.asarray(pattern, dtype=np.float32))
             self._includeZernikePattern = True
+        self._bridge.notify_parameters_changed("zernike", updated_aberrations.copy())
         if update:
             self.publishCurrentPattern()
+
+    def setModificationParameters(self, values: Mapping[str, float], update: bool = True) -> None:
+        """Apply optical parameters in GUI units: micrometers, nanometers and millimeters."""
+        normalized: dict[str, float] = {}
+        for name, value in values.items():
+            if name not in self._modification_parameters:
+                raise ValueError(f"Unknown modification parameter: {name}")
+            value = float(value)
+            if not np.isfinite(value) or (name not in ("X", "Y", "Z") and value <= 0):
+                raise ValueError(f"Invalid modification parameter: {name}")
+            normalized[name] = value
+        with self._lock:
+            parameters = {**self._modification_parameters, **normalized}
+            height, width = self.shape
+            pattern = makeSlmPhaseForSingleFocalSpot(
+                x=parameters["X"] * 1e-6, y=parameters["Y"] * 1e-6, z=parameters["Z"] * 1e-6,
+                wavelength=parameters["wavelength"] * 1e-9,
+                f_objective=parameters["focal_length"] * 1e-3,
+                magnification=parameters["magnification"], Nx=width, Ny=height,
+                dx=parameters["pixel_pitch"] * 1e-6, dy=parameters["pixel_pitch"] * 1e-6,
+            )
+            self._modificationPattern = self._flip_imported_pattern(
+                wrap_phase(pattern), self._flipModificationPatternHorizontally, self._flipModificationPatternVertically,
+            )
+            self._modification_parameters = parameters
+            self._includeModificationPattern = True
+        self._bridge.notify_parameters_changed("modification", parameters.copy())
+        if update:
+            self.publishCurrentPattern()
+
+    def rememberModificationParameters(self, parameters: tuple[float, ...]) -> None:
+        """Retain the parameters used by the GUI's asynchronous calculation."""
+        with self._lock:
+            self._modification_parameters = dict(zip(self._modification_parameters, parameters, strict=True))
 
     def getZernikeCartGrid(self) -> RZern:
         """Create the screen-sized Zernike grid on first use and reuse it afterwards."""

@@ -139,6 +139,35 @@ class SlmHeroConnector(LocalHERO):
         self._log_setter(method_name, value)
         self._hologram_manager.setZernikeAberrations({mode: value}, update)
 
+    def setModificationX(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationX", value)
+        self._hologram_manager.setModificationParameters({"X": value}, update)
+
+    def setModificationY(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationY", value)
+        self._hologram_manager.setModificationParameters({"Y": value}, update)
+
+    def setModificationZ(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationZ", value)
+        self._hologram_manager.setModificationParameters({"Z": value}, update)
+
+    def setModificationWavelength(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationWavelength", value)
+        self._hologram_manager.setModificationParameters({"wavelength": value}, update)
+
+    def setModificationFocalLength(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationFocalLength", value)
+        self._hologram_manager.setModificationParameters({"focal_length": value}, update)
+
+    def setModificationMagnification(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationMagnification", value)
+        self._hologram_manager.setModificationParameters({"magnification": value}, update)
+
+    def setModificationPixelPitch(self, value: float, update: bool = True) -> None:
+        self._log_setter("setModificationPixelPitch", value)
+        self._hologram_manager.setModificationParameters({"pixel_pitch": value}, update)
+
+
     def _log_setter(self, method_name: str, value: bool | float | None = None) -> None:
         value_text = "" if value is None else f" with value={value}"
         self._hologram_manager.write_to_console(f"Heros: {method_name} requested{value_text}.")

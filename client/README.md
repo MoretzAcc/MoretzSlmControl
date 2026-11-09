@@ -31,6 +31,28 @@ with SlmHeroApi(hero_name) as slm:
 ```
 
 
+## Remote optical parameters
+
+Zernike setters also synchronize the corresponding coefficient fields in the desktop UI.
+Modification setters use the same units as the UI: X/Y/Z and pixel pitch in micrometers,
+wavelength in nanometers, focal length in millimeters, and unitless magnification.
+
+```python
+with SlmHeroApi(hero_name) as slm:
+    slm.setZernikeAstigmatism0(0.2)
+    slm.setModificationWavelength(780)
+    slm.setModificationFocalLength(20)
+    slm.setModificationMagnification(2)
+    slm.setModificationPixelPitch(8)
+    slm.setModificationX(1500)
+    slm.setModificationY(-250)
+    slm.setModificationZ(10)
+```
+
+Each setter recalculates the modification pattern using the other current parameters.
+The UI automatically increases its slider range to include remotely supplied shifts;
+smaller shifts do not shrink it. Slider max shift has no HEROS setter.
+
 ## Bounded notebook previews
 
 ```python

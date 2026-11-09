@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from math import floor, log10
+from math import ceil, floor, log10
 from html import escape
 from pathlib import Path
 from threading import Thread
@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
         self._monitor_manager.consoleChanged.connect(self._on_console_changed)
         self._monitor_manager.screenGeometryChanged.connect(self._discard_session_state)
+        self._monitor_manager.parametersChanged.connect(self._on_remote_parameters_changed)
         self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")
@@ -1212,7 +1213,7 @@ class MainWindow(QMainWindow):
             return
 
         tick_size = self._slider_tick_size(maximum_shift)
-        slider_limit = floor(maximum_shift / tick_size)
+        slider_limit = ceil(maximum_shift / tick_size)
         for axis, slider in self._shift_sliders.items():
             slider.blockSignals(True)
             slider.setRange(-slider_limit, slider_limit)
@@ -1415,6 +1416,7 @@ class MainWindow(QMainWindow):
         try:
             if component == "modification":
                 displayer.setModificationPattern(result)
+                displayer.rememberModificationParameters(parameters)
                 self._last_modification_parameters[screen_uid] = parameters
             else:
                 cart_grid, pattern, aberrations = result
@@ -1426,6 +1428,40 @@ class MainWindow(QMainWindow):
             self._write_console_for_screen(screen_uid, f"Error: could not apply {component} pattern: {error}")
             return
         if screen_uid == self._selected_screen_uid():
+            self.updatePreview()
+
+    @Slot(str, str, object)
+    def _on_remote_parameters_changed(self, screen_uid: str, component: str, values: dict[str, float]) -> None:
+        """Synchronize remote changes on the GUI thread and discard obsolete GUI work."""
+        key = screen_uid, component
+        self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
+        self._queued_pattern_calculations.pop(key, None)
+        self._pending_pattern_calculations.discard(key)
+        selected = screen_uid == self._selected_screen_uid()
+        if component == "zernike":
+            inputs = {**self._zernike_inputs_by_screen.get(screen_uid, self._default_zernike_inputs),
+                      **{name: self._format_number(value) for name, value in values.items()}}
+            self._zernike_inputs_by_screen[screen_uid] = inputs
+            self._last_zernike_parameters.pop(screen_uid, None)
+            if selected:
+                self._load_zernike_inputs(screen_uid)
+        else:
+            inputs = dict(self._modification_inputs_by_screen.get(screen_uid, self._default_modification_inputs))
+            if selected:
+                inputs.update(self._modification_input_values())
+                for axis, slider in self._shift_sliders.items():
+                    slider.cancel_pending_wheel_update()
+                    self._shift_update_timers[axis].stop()
+            inputs.update({name: self._format_number(value) for name, value in values.items()})
+            maximum = max(float(inputs["max_shift"]), *(abs(float(inputs[axis])) for axis in ("X", "Y", "Z")))
+            inputs["max_shift"] = self._format_number(maximum)
+            self._modification_inputs_by_screen[screen_uid] = inputs
+            self._last_modification_parameters.pop(screen_uid, None)
+            if selected:
+                self._load_modification_inputs(screen_uid)
+        self._refresh_calculation_status()
+        if selected:
+            self._sync_pattern_active_checks(screen_uid)
             self.updatePreview()
 
     def _refresh_calculation_status(self) -> None:
@@ -1474,7 +1510,7 @@ class MainWindow(QMainWindow):
             tick_size = self._slider_tick_size(maximum_shift)
         except ValueError:
             return
-        slider_limit = floor(maximum_shift / tick_size)
+        slider_limit = ceil(maximum_shift / tick_size)
         for axis, slider in self._shift_sliders.items():
             slider.blockSignals(True)
             slider.setRange(-slider_limit, slider_limit)
