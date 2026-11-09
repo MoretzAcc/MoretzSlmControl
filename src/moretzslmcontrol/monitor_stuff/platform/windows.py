@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import winreg
+from pywintypes import com_error
 
 from PySide6.QtGui import QScreen
 
@@ -43,8 +44,13 @@ class WindowsPlatformAdapter(PlatformAdapter):
             return ""
 
     def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
+        try:
+            monitors = windows_match_edids(screen)
+        except com_error as error:
+            logger.warning("%s: Windows monitor EDID is unavailable; using Qt screen metadata: %s", screen.name(), error)
+            return []
         return [
-            MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid, bits_per_channel=edid_bits_per_channel(win_monitor.edid)) for win_monitor in windows_match_edids(screen)
+            MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid, bits_per_channel=edid_bits_per_channel(win_monitor.edid)) for win_monitor in monitors
         ]
 
     def attach_window_to_screen(self, window: QWidget, screen: QScreen) -> None:

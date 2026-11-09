@@ -9,6 +9,7 @@ import logging
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
+from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from math import ceil, floor, log10
 from html import escape
@@ -24,6 +25,7 @@ from sys import platform
 from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap, QShortcut, QKeySequence, QFont
 from PySide6.QtWidgets import (
     QCheckBox,
+    QAbstractButton,
     QApplication,
     QFormLayout,
     QFileDialog,
@@ -40,6 +42,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QScrollArea,
+    QSlider,
     QSizePolicy,
     QStackedWidget,
     QTextEdit,
@@ -63,6 +67,9 @@ from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForS
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
 from moretzslmcontrol.userinterface.ui_util.cross_out_preview import disabled_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
+from moretzslmcontrol.userinterface.ui_settings_dialog import UiSettingsDialog
+from moretzslmcontrol.userinterface.pattern_composition_group import PatternCompositionGroup
+from moretzslmcontrol.util.ui_settings import UiSettings, load_ui_settings, save_ui_settings, ui_settings_path
 
 if TYPE_CHECKING:
     from moretzslmcontrol.hologram_manager import HologramManager
@@ -84,6 +91,8 @@ class MainWindow(QMainWindow):
         self,
         monitor_manager: MonitorManager,
         on_close_requested: Callable[[], None] | None = None,
+        *,
+        settings_path: Path | None = None,
     ) -> None:
         super().__init__()
         self._monitor_manager = monitor_manager
@@ -124,14 +133,21 @@ class MainWindow(QMainWindow):
         self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")
-        self._ui_scale = 1.0
+        self._settings_path = settings_path if settings_path is not None else ui_settings_path()
+        try:
+            self._ui_settings = load_ui_settings(self._settings_path)
+        except OSError as error:
+            logger.warning("Could not load/save UI settings at %s: %s", self._settings_path, error)
+            self._ui_settings = UiSettings()
+        self._ui_scale = self._ui_settings.global_scale
+        self._ui_settings_dialog: UiSettingsDialog | None = None
         self._base_fonts: dict[QWidget, Any] = {}
         self._base_minimum_sizes: dict[QWidget, Any] = {}
+        self._base_maximum_sizes: dict[QWidget, Any] = {}
         self._base_layout_metrics: dict[QLayout, tuple[Any, int]] = {}
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
-        self._list_widget.setMaximumWidth(210)
         self._list_widget.currentItemChanged.connect(self._update_selected_screen)
 
         self._details_page = self._build_details_page()
@@ -151,30 +167,48 @@ class MainWindow(QMainWindow):
         refresh_button.clicked.connect(self._monitor_manager.rescan_screens)
         sidebar_layout.addWidget(refresh_button)
         scale_row = QHBoxLayout()
-        scale_row.addWidget(QLabel("Scale UI"))
-        self._scale_label = QLabel("100%")
+        scale_row.setSpacing(4)
+        self._scale_label = QLabel("Scale UI: 100%")
         self._scale_down_button = QPushButton("-")
         self._scale_up_button = QPushButton("+")
+        self._scale_settings_button = QPushButton("\u2699")
+        self._scale_settings_button.setAccessibleName("UI settings")
+        self._scale_settings_button.setToolTip("UI settings: font, element and preview factors")
+        self._scale_settings_button.clicked.connect(self._show_ui_settings)
+        for button in (self._scale_up_button, self._scale_down_button, self._scale_settings_button):
+            button.setFixedSize(26, 26)
         self._scale_down_button.setToolTip("Decrease UI scale (Ctrl+-)")
         self._scale_up_button.setToolTip("Increase UI scale (Ctrl++)")
         self._scale_down_button.clicked.connect(lambda: self._change_ui_scale(-0.05))
         self._scale_up_button.clicked.connect(lambda: self._change_ui_scale(0.05))
-        scale_row.addWidget(self._scale_down_button)
         scale_row.addWidget(self._scale_label)
         scale_row.addWidget(self._scale_up_button)
+        scale_row.addWidget(self._scale_down_button)
+        scale_row.addWidget(self._scale_settings_button)
         sidebar_layout.addLayout(scale_row)
-
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.VLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
 
         central_widget = QWidget()
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 12, 0)
         main_layout.setSpacing(0)
-        main_layout.addWidget(sidebar)
-        main_layout.addWidget(separator)
-        main_layout.addWidget(self._content_stack, 1)
+        self._sidebar_scroll = QScrollArea()
+        self._sidebar_scroll.setWidgetResizable(True)
+        self._sidebar_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._sidebar_scroll.setMinimumWidth(120)
+        self._sidebar_scroll.setWidget(sidebar)
+        self._content_scroll = QScrollArea()
+        self._content_scroll.setWidgetResizable(True)
+        self._content_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._content_scroll.setWidget(self._content_stack)
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter.setChildrenCollapsible(False)
+        self._main_splitter.setHandleWidth(5)
+        self._main_splitter.addWidget(self._sidebar_scroll)
+        self._main_splitter.addWidget(self._content_scroll)
+        self._main_splitter.setStretchFactor(0, 0)
+        self._main_splitter.setStretchFactor(1, 1)
+        self._main_splitter.handle(1).setToolTip("Drag to resize the screen sidebar")
+        main_layout.addWidget(self._main_splitter, 1)
         self.setCentralWidget(central_widget)
 
         self._scale_shortcuts = [
@@ -185,7 +219,15 @@ class MainWindow(QMainWindow):
         self._scale_shortcuts[1].activated.connect(lambda: self._change_ui_scale(0.05))
         for widget in [*self.findChildren(QWidget), self]:
             self._base_fonts[widget] = widget.font()
-            self._base_minimum_sizes[widget] = widget.minimumSize()
+            minimum = widget.minimumSize()
+            if isinstance(widget, (QAbstractButton, QLineEdit, QSlider)):
+                hint = widget.sizeHint()
+                if minimum.width() == 0:
+                    minimum.setWidth(max(0, hint.width()))
+                if minimum.height() == 0:
+                    minimum.setHeight(max(0, hint.height()))
+            self._base_minimum_sizes[widget] = minimum
+            self._base_maximum_sizes[widget] = widget.maximumSize()
         for child_layout in self.findChildren(QLayout):
             self._base_layout_metrics[child_layout] = (child_layout.contentsMargins(), child_layout.spacing())
         screen = QApplication.primaryScreen()
@@ -193,13 +235,8 @@ class MainWindow(QMainWindow):
         frame_allowance = 52 if platform == "win32" else 0
         window_height = min(880, max(480, available.height() - frame_allowance))
         self.resize(min(1550, available.width()), window_height)
-        self.setFixedSize(self.size())
-        initial_scale = min(1.0, max(0.55, (window_height - 30) / 1050))
-        initial_scale = int(initial_scale * 20) / 20
-        while self._ui_scale > initial_scale + 0.001:
-            self._change_ui_scale(-0.05)
-
-        self._change_ui_scale(0)
+        self._main_splitter.setSizes([240, max(1, self.width() - 240)])
+        self._apply_ui_scale()
         self.refresh_views()
 
     def refresh_views(self) -> None:
@@ -217,17 +254,52 @@ class MainWindow(QMainWindow):
         self._update_selected_screen()
 
     def _change_ui_scale(self, delta: float) -> None:
-        self._ui_scale = min(1.0, max(0.55, round(self._ui_scale + delta, 2)))
-        for key in ("base", "hologram", "zernike", "modification"):
-            self._preview_labels[key].setMaximumWidth(16777215)
-        element_scale = self._ui_scale * 0.9
+        value = min(3.0, max(0.25, round(self._ui_settings.global_scale + delta, 2)))
+        self._set_ui_settings(replace(self._ui_settings, global_scale=value))
+
+    def _show_ui_settings(self) -> None:
+        if self._ui_settings_dialog is None:
+            self._ui_settings_dialog = UiSettingsDialog(self._ui_settings, self)
+            self._ui_settings_dialog.settingsChanged.connect(self._set_ui_settings)
+        self._ui_settings_dialog.set_settings(self._ui_settings)
+        self._ui_settings_dialog.show()
+        self._ui_settings_dialog.raise_()
+        self._ui_settings_dialog.activateWindow()
+
+    def _set_ui_settings(self, settings: UiSettings) -> None:
+        self._ui_settings = settings
+        self._ui_scale = settings.global_scale
+        self._apply_ui_scale()
+        if self._ui_settings_dialog is not None:
+            self._ui_settings_dialog.set_settings(settings)
+        try:
+            save_ui_settings(self._settings_path, settings)
+        except OSError as error:
+            logger.warning("Could not save UI settings at %s: %s", self._settings_path, error)
+            self.statusBar().showMessage(f"Could not save UI settings: {error}", 10000)
+
+    def _apply_ui_scale(self) -> None:
+        font_scale = self._ui_settings.global_scale * self._ui_settings.font_scale
+        element_scale = self._ui_settings.global_scale * self._ui_settings.element_scale
+        numeric_fields = {*self._shift_inputs.values(), *self._modification_parameter_fields.values(), *self._zernike_parameter_fields.values()}
         for widget, base_font in self._base_fonts.items():
             font = QFont(base_font)
             if font.pointSizeF() > 0:
-                font.setPointSizeF(max(5.0, font.pointSizeF() * self._ui_scale))
+                font.setPointSizeF(max(1.0, font.pointSizeF() * font_scale))
                 widget.setFont(font)
+            if widget in self._preview_labels.values():
+                continue
             base_size = self._base_minimum_sizes[widget]
-            widget.setMinimumSize(round(base_size.width() * element_scale), round(base_size.height() * element_scale))
+            maximum = self._base_maximum_sizes[widget]
+            minimum_height = round(base_size.height() * element_scale)
+            if widget in numeric_fields:
+                minimum_height = max(minimum_height, ceil(widget.fontMetrics().height() * 1.8))
+            minimum_width = base_size.width() if widget is self._sidebar_scroll else round(base_size.width() * element_scale)
+            widget.setMinimumSize(minimum_width, minimum_height)
+            widget.setMaximumSize(
+                round(maximum.width() * element_scale) if maximum.width() < 16777215 else 16777215,
+                round(maximum.height() * element_scale) if maximum.height() < 16777215 else 16777215,
+            )
         for child_layout, (margins, spacing) in self._base_layout_metrics.items():
             child_layout.setContentsMargins(
                 round(margins.left() * element_scale),
@@ -237,17 +309,27 @@ class MainWindow(QMainWindow):
             )
             if spacing >= 0:
                 child_layout.setSpacing(round(spacing * element_scale))
-        self._scale_label.setText(f"{self._ui_scale:.0%}")
-        self._screen_title.setStyleSheet(
-            f"font-size: {20 * self._ui_scale:g}px; font-weight: 600;"
+        # Unit columns must stay aligned and readable when fonts grow independently.
+        unit_width = max(
+            max(round(self._base_minimum_sizes[label].width() * element_scale),
+                label.fontMetrics().horizontalAdvance("\u00b5m"))
+            for label in self._modification_unit_labels.values()
         )
+        for label in self._modification_unit_labels.values():
+            label.setFixedWidth(unit_width)
+        self._scale_label.setText(f"Scale UI: {self._ui_scale:.0%}")
+        self._scale_up_button.setEnabled(self._ui_scale < 3)
+        self._scale_down_button.setEnabled(self._ui_scale > 0.25)
+        self._screen_title.setStyleSheet(
+            f"font-size: {20 * font_scale:g}px; font-weight: 600;"
+        )
+        self._equalize_pattern_previews()
         QTimer.singleShot(0, self._equalize_pattern_previews)
 
     def _equalize_pattern_previews(self) -> None:
-        previews = [self._preview_labels[key] for key in ("base", "hologram", "zernike", "modification")]
-        common_width = min(preview.width() for preview in previews)
-        for preview in previews:
-            preview.setFixedWidth(common_width)
+        width = max(1, round(220 * self._ui_settings.global_scale * self._ui_settings.preview_scale))
+        for preview in self._preview_labels.values():
+            preview.setFixedWidth(width)
         self._fit_preview_aspect_ratios()
 
     def _fit_preview_aspect_ratios(self) -> None:
@@ -288,19 +370,18 @@ class MainWindow(QMainWindow):
         self._slm_window_button = QPushButton()
         self._slm_window_button.setMinimumHeight(36)
         self._slm_window_button.setCheckable(True)
-        self._slm_output_status = QLabel("Output off")
-        self._slm_output_status.setAccessibleName("SLM output state")
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
+        self._reset_session_button = QPushButton("Reset session\u2026")
+        self._reset_session_button.clicked.connect(self._reset_session)
+        title_row.addWidget(self._reset_session_button)
         export_button = QPushButton("Export configuration…")
         export_button.clicked.connect(self._export_configuration)
         title_row.addWidget(export_button)
         import_button = QPushButton("Import configuration…")
         import_button.clicked.connect(self._import_configuration)
         title_row.addWidget(import_button)
-        self._reset_session_button = QPushButton("Reset session…")
-        self._reset_session_button.clicked.connect(self._reset_session)
         page_layout.addLayout(title_row)
 
         information_row = QHBoxLayout()
@@ -309,27 +390,19 @@ class MainWindow(QMainWindow):
         screen_information.setMinimumWidth(300)
         information_row.addWidget(screen_information, 1)
         monitor_information = self._build_monitor_information_group()
+        self._monitor_information_group = monitor_information
         information_row.addWidget(monitor_information, 2)
         applied_preview = self._build_applied_hologram_group()
         information_row.addWidget(applied_preview, 1)
-        monitor_information.setMaximumHeight(220)
-        applied_preview.setMaximumHeight(220)
         page_layout.addLayout(information_row)
-        lower_splitter = QSplitter(Qt.Orientation.Vertical)
-        lower_splitter.setChildrenCollapsible(False)
-        lower_splitter.addWidget(self._build_pattern_group())
-        lower_splitter.addWidget(self._build_console_group())
-        lower_splitter.setStretchFactor(0, 1)
-        lower_splitter.setStretchFactor(1, 0)
-        lower_splitter.setSizes([280, 120])
-        page_layout.addWidget(lower_splitter, 2)
+        page_layout.addWidget(self._build_pattern_group(), 0, Qt.AlignmentFlag.AlignTop)
+        page_layout.addStretch(1)
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:
         group = QGroupBox("Hologram Preview")
         group.setMinimumWidth(260)
         layout = QVBoxLayout(group)
-        layout.addWidget(self._slm_output_status)
         layout.addWidget(self._build_pattern_component(None, component_key="total"), 1)
         return group
 
@@ -368,11 +441,16 @@ class MainWindow(QMainWindow):
             card.setMinimumWidth(250)
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(8, 6, 8, 6)
+            card_layout.setSpacing(4)
             title = QLabel(f"Monitor {index + 1}")
-            title.setStyleSheet("font-weight: 600;")
-            card_layout.addWidget(title)
+            title_font = title.font()
+            title_font.setBold(True)
+            title.setFont(title_font)
+            title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            card_layout.addWidget(title, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
             form = QFormLayout()
+            form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
             form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
             fields: dict[str, QLabel] = {}
@@ -387,10 +465,12 @@ class MainWindow(QMainWindow):
             ):
                 value = self._new_information_label()
                 value.setWordWrap(True)
+                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
                 value.setMinimumWidth(145)
                 fields[key] = value
                 form.addRow(f"{label}:", value)
             card_layout.addLayout(form)
+            card_layout.addStretch(1)
             card.hide()
             self._associated_monitor_cards.append(card)
             self._associated_monitor_titles.append(title)
@@ -400,9 +480,11 @@ class MainWindow(QMainWindow):
         return group
 
     def _build_pattern_group(self) -> QGroupBox:
-        group = QGroupBox("Pattern composition")
+        group = PatternCompositionGroup("Pattern composition")
         grid = QGridLayout(group)
-        grid.setRowStretch(1, 1)
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        grid.setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+        file_controls: list[QWidget] = []
         for index, (title, key, options) in enumerate((
             ("Correction", "base", {"has_file_selector": True}),
             ("Hologram", "hologram", {"has_file_selector": True}),
@@ -411,19 +493,35 @@ class MainWindow(QMainWindow):
         )):
             column = index * 2
             controls = self._build_pattern_component(None, component_key=key, **options)
+            if key in ("base", "hologram"):
+                file_controls.append(controls)
             preview = self._preview_labels[key]
             controls.layout().removeWidget(preview)
             preview.setMinimumSize(0, 40)
             preview.setMaximumSize(16777215, 16777215)
-            preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
-            grid.addWidget(QLabel(title), 0, column)
-            grid.addWidget(preview, 1, column)
+            preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+            heading = QLabel(title)
+            heading_font = heading.font()
+            heading_font.setBold(True)
+            heading.setFont(heading_font)
+            heading.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            heading.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            grid.addWidget(heading, 0, column, alignment=Qt.AlignmentFlag.AlignTop)
+            grid.addWidget(preview, 1, column, alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             grid.addWidget(controls, 2, column, alignment=Qt.AlignmentFlag.AlignTop)
             grid.setColumnStretch(column, 1)
             if index < 3:
                 operator = QLabel("+")
+                operator_font = operator.font()
+                operator_font.setBold(True)
+                operator_font.setPointSizeF(operator_font.pointSizeF() * 1.5)
+                operator.setFont(operator_font)
                 operator.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 grid.addWidget(operator, 1, column + 1)
+        group.embed_console(
+            self._build_console_group(), grid, (file_controls[0], file_controls[1]),
+            padding_reference=self._monitor_information_group.layout(),
+        )
         return group
 
     def _build_pattern_component(
@@ -439,6 +537,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(component)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         if title is not None:
             title_label = QLabel(title)
@@ -457,7 +556,7 @@ class MainWindow(QMainWindow):
         preview.setForegroundRole(preview.foregroundRole())
         if component_key is not None:
             self._preview_labels[component_key] = preview
-        layout.addWidget(preview, 1 if component_key == "total" else 0)
+        layout.addWidget(preview, 0, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
 
         if component_key != "total":
             enabled = QCheckBox("Active")
@@ -628,6 +727,7 @@ class MainWindow(QMainWindow):
                 "physical_size_mm": [record.physical_size_x, record.physical_size_y],
             },
             "controls": {
+                "ui": self._ui_settings.to_dict(),
                 "connections": {"heros": displayer.isHeroEnabled()},
                 "pattern_inclusion": displayer.getPatternInclusion(),
                 "flips": self._flip_state_mapping(flip_states),
@@ -716,6 +816,7 @@ class MainWindow(QMainWindow):
         )
         flips = self._configuration_flip_mapping(controls["flips"])
         connections = self._configuration_bool_mapping(controls.get("connections", {"heros": True}), ("heros",), "connections")
+        ui_settings = UiSettings.from_mapping(controls["ui"]) if "ui" in controls else None
 
         correction: NDArray[np.float32] | None = None
         hologram: NDArray[np.float32] | None = None
@@ -727,6 +828,8 @@ class MainWindow(QMainWindow):
             if correction.shape != expected_shape or hologram.shape != expected_shape:
                 raise ValueError("Configuration pattern dimensions do not match the selected SLM")
 
+        if ui_settings is not None:
+            self._set_ui_settings(ui_settings)
         self._monitor_manager.set_heros_enabled(screen_uid, connections["heros"])
         self._modification_inputs_by_screen[screen_uid] = modification_inputs
         self._zernike_inputs_by_screen[screen_uid] = zernike_inputs
@@ -1532,19 +1635,14 @@ class MainWindow(QMainWindow):
         return f"{value:g}"
 
     def _build_console_group(self) -> QGroupBox:
-        group = QGroupBox()
+        group = QGroupBox("Console")
         layout = QVBoxLayout(group)
-        title_row = QHBoxLayout()
-        console_title = QLabel("Console")
-        console_title.setStyleSheet("font-weight: 600;")
-        title_row.addWidget(console_title)
-        title_row.addStretch()
-        title_row.addWidget(self._reset_session_button)
-        layout.addLayout(title_row)
         self._console = QTextEdit()
         self._console.setReadOnly(True)
         self._console.setPlaceholderText("Nothing to show yet.")
-        self._console.setMinimumHeight(78)
+        self._console.setMinimumHeight(0)
+        self._console.setMinimumWidth(0)
+        self._console.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         layout.addWidget(self._console)
         return group
 
@@ -1687,7 +1785,6 @@ class MainWindow(QMainWindow):
         self._slm_window_button.setText("Disable SLM output" if enabled else "Enable SLM output")
         self._slm_window_button.setEnabled(connected or enabled)
         self._slm_window_button.setToolTip("Show or hide the native fullscreen SLM output without changing its pattern.")
-        self._slm_output_status.setText("Output on" if enabled and connected else "Output disconnected" if not connected else "Output off")
 
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:
