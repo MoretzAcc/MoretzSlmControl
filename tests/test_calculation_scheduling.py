@@ -154,3 +154,11 @@ class CalculationSchedulingTest(unittest.TestCase):
 
     def test_screen_information_keeps_bit_depth_compatibility_fields(self) -> None:
         self.assertTrue({"output_depth", "monitor_depth", "depth_warning"}.issubset(self.window._screen_info_fields))
+
+    def test_all_previews_follow_the_monitor_aspect_ratio(self) -> None:
+        self.window._preview_aspect_ratio = 16 / 9
+        self.window.show()
+        self.app.processEvents()
+        self.window._fit_preview_aspect_ratios()
+        for preview in self.window._preview_labels.values():
+            self.assertAlmostEqual(preview.width() / preview.height(), 16 / 9, delta=0.02)

@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self._loaded_pattern_paths: dict[str, dict[str, str]] = {}
         self._pattern_path_fields: dict[str, QLineEdit] = {}
         self._preview_labels: dict[str, QLabel] = {}
+        self._preview_aspect_ratio = 16 / 9
         self._shift_sliders: dict[str, DeferredWheelSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
         self._shift_update_timers: dict[str, QTimer] = {}
@@ -246,6 +247,13 @@ class MainWindow(QMainWindow):
         common_width = min(preview.width() for preview in previews)
         for preview in previews:
             preview.setFixedWidth(common_width)
+        self._fit_preview_aspect_ratios()
+
+    def _fit_preview_aspect_ratios(self) -> None:
+        """Make every preview surface match the selected monitor's native shape."""
+        for preview in self._preview_labels.values():
+            if preview.width() > 0:
+                preview.setFixedHeight(max(1, round(preview.width() / self._preview_aspect_ratio)))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
@@ -934,10 +942,13 @@ class MainWindow(QMainWindow):
             "modification": inclusion["modification"],
             "total": session is not None and self._is_slm_window_enabled(session.state),
         }
+        height, width = patterns["total"].shape
+        self._preview_aspect_ratio = width / height
         for component_key, pattern in patterns.items():
             self._set_preview_image(
                 self._preview_labels[component_key], pattern, active=active_by_component[component_key]
             )
+        QTimer.singleShot(0, self._fit_preview_aspect_ratios)
 
     @staticmethod
     def _set_preview_image(
