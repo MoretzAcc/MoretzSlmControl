@@ -36,6 +36,7 @@ else:
     raise Exception(f"Unsupported platform: {system_name}")
 
 # Import Qt
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 
@@ -57,6 +58,13 @@ def _install_signal_handlers(app: QApplication, shutdown_reason: ShutdownReason)
         signal_name = signal.Signals(signal_number).name
         shutdown_reason.record(f"received {signal_name}")
         app.exit(128 + signal_number)
+
+    # Qt can remain in native app.exec() indefinitely when idle. Enter Python
+    # periodically so its deferred Unix signal handlers can run promptly.
+    poll_timer = QTimer(app)
+    poll_timer.setInterval(100)
+    poll_timer.timeout.connect(lambda: None)
+    poll_timer.start()
 
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signal_number, handle_signal)

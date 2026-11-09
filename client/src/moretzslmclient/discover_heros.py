@@ -16,12 +16,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-observer = HEROObserver()
-
 def discover_slm_heros() -> list[str]:
-    heros = observer._discover()
-    return [
-        hero["name"]
-        for hero in heros.values()
-        if hero.get("class") == "SlmHeroConnector"
-    ]
+    """Discover on demand and release the network session before returning."""
+    with HEROObserver() as observer:
+        heros = observer.known_objects
+        return [hero["name"] for hero in heros.values() if hero.get("class") == "SlmHeroConnector"]

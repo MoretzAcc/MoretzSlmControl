@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 
 
 FORMAT_NAME = "moretzslmcontrol-configuration"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 _PATTERN_ENCODING = "base64+zlib"
 
 
@@ -75,7 +75,7 @@ def load_configuration(path: str | Path) -> dict[str, Any]:
     configuration = _as_mapping(loaded, "configuration")
     if configuration.get("format") != FORMAT_NAME:
         raise ValueError("This file is not a Moretz SLM Control configuration")
-    if configuration.get("format_version") != FORMAT_VERSION:
+    if configuration.get("format_version") not in (1, FORMAT_VERSION):
         raise ValueError("This configuration format version is not supported")
     slm = _as_mapping(configuration.get("slm"), "slm")
     for dimension in ("width", "height"):

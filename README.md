@@ -23,7 +23,8 @@ Tested using Spatial Light Modulators from:
 ## Install and run
 
 ```bash
-git pull <your preferred method of pulling>
+git clone https://github.com/MoretzAcc/MoretzSlmControl.git
+cd MoretzSlmControl
 uv sync
 uv run moretzslmcontrol
 ```
@@ -31,19 +32,23 @@ uv run moretzslmcontrol
 ## Usage
 
 1. Select a detected screen from the sidebar.
-2. Enable its SLM window.
+2. Enable its SLM output. The control keeps keyboard focus; the native output remains fullscreen.
 3. Load correction and hologram patterns from `.npy` or `.bmp` files.
-4. Adjust the modification pattern and screen-specific settings as needed.
+4. Edit the Correction, Hologram, Zernike and Modification controls alongside the output preview. Use **Scale UI** in the sidebar or Ctrl+- / Ctrl++ to adjust the interface size.
+5. Slider values update while dragging. Pattern calculation runs asynchronously and combines rapid edits into the newest desired state.
+6. Export configuration to save the session settings and patterns, or import a saved configuration. Current exports use format v2; legacy v1 remains readable.
 
 ## HEROS integration
 
 Each active SLM is exposed through [HEROS](https://pypi.org/project/heros/). This allows another process on the same computer, or a process on another device in the same network, to control the SLM without interacting
 with the GUI directly. Each screen has its own HERO name and console output.
 
+The connection toggle is temporarily hidden while its behavior is stabilized. HEROS functionality and the saved connection preference remain supported. Remote Zernike and modification setters update the desktop controls; shifts outside the current slider range expand it automatically.
+
 The lightweight client is available as a separate package and supports Python 3.11 or newer.
 To import the client in any of your projects:
 
-Install the client using pip or conda:
+Install the client using pip:
 
 ```bash
 python -m pip install "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
@@ -55,7 +60,7 @@ Using uv:
 uv add "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
 ```
 
-How to use it is described in /client/README.md.
+See the [client README](client/README.md) for examples and parameter units. Use a client from the same branch or release as the server when trying unreleased API additions.
 
 ## Development
 
@@ -68,20 +73,13 @@ uv run python -m unittest discover -s tests
 ## Notes
 
 - The pattern coordinate origin is at the bottom left.
-- Display, Screen and Monitor are not synonymous:
-  - Display and Screen can be treated as synonymous. There are defined in Software.
-  - Monitors are the hardware connected to the PC. Through screen mirroring, multiple monitors can show the same Screen. 
-- Screens and Monitors do not have a safe unique ID.
-  - This software generates a unique ID for each screen based on:
-    - Display Name
-    - Serial Numbers of all Monitors showing this screen (empty for many devices)
-    - Manufacturer Date of all Monitors showing this screen
-    - OS Identifies of all Monitors showing this screen (related to the connected Port)
-  - With this, it is impossible to have two screens with the same UID connected at the same time. 
+- A Screen (or Display) is a software output; a Monitor is physical hardware. Screen mirroring can make multiple monitors show one screen. Bits per channel are reported in each monitor's details when available; SLM output currently uses 8-bit values.
+- Screen IDs and HERO names incorporate host, display, monitor metadata and connector information. They are intended to stay stable for an unchanged computer/monitor/port combination, but missing or duplicate metadata prevents a uniqueness guarantee. Screens without EDID use a host/Qt connector fallback. Changing ports or available metadata can change an ID.
+- Geometry/DPI changes trigger a rescan. If the detected output resolution changes, patterns and optical parameters reset to match the new dimensions. Export configuration before changing display settings if you need to preserve the session.
 
 ## Known issues
 
-- Changing monitor settings while the application is running, such as display scaling, is not detected by refresh.
 - This software is supposed to be able to deal with OS-sided display scaling. However, for very strong (e.g. 20%, 500%) or fractional scaling (e.g. 85%), some issues may appear.
-- EDID detection is unstable on Linux. It has been tested with KDE Wayland and Ubuntu GNOME Wayland. It works in most cases, but might break for cases where multiple monitors or monitor duplication is enabled. However, a
-  fail would be noticeable immediately.
+- Linux EDID detection has been tested with KDE Wayland and Ubuntu GNOME Wayland, but monitor mapping can be unreliable with multiple or mirrored monitors. Check the detected monitor details before enabling output.
+
+See the [changelog](dev/CHANGELOG.md) for release changes and [development notes](dev/DEV_NOTES.md) for remaining work and platform validation needs.

@@ -1,44 +1,48 @@
+# Development notes
 
-Run Program
+## Development commands
+
 ```bash
 uv run moretzslmcontrol
-```
-
-Run unit tests:
-```bash
+uv run ruff check .
 uv run python -m unittest discover -s tests
 ```
 
-### TODO Bugs / Issues
+## Release preparation
 
-- when slm window is enabled it gains focus (at least on linux) i dont want that
-- Windows Aero Peek, one idea to fix is in anti_aero_peak.py
+- Version 0.3.5 integrates the reviewed `master-testing` changes into `master`. Server and client distribution versions are synchronized.
+- Release notes are recorded in the [changelog](CHANGELOG.md). Collect subsequent changes in a new Unreleased section until the next version is chosen.
+- The current distribution version is recorded in `VERSION`. Historical changelog entries contain version labels that do not consistently match it; do not derive the next version from those labels alone.
+- At release time, update `VERSION`, run `uv run python dev/sync_version.py`, and verify the resulting package metadata.
+- Release validation commands are listed above. Offscreen checks cannot validate focus, compositor behavior, output fidelity, or native monitor discovery; record native desktop and physical SLM checks separately when performed.
 
-### TODO Tasks
+## Completed in 0.3.5
 
-- ! Design: Rework design of the enable / disable window button
-- Connection via Heros toggleable
-- remove duplicate code from client and server
-- make plotHologram faster
-- Method hologram_manager.py -> _set_pattern_flip stinks
-- ! Show bitdepth in the UI
-    - Detect if SLM bitdepth is > 8, and warn the user taht this is not supported by this software.
-- ! Design: Replace crossout by text "Disabled" or "Off"
-  - Black text auf white background, text and background are slightly opaque, has to be calculated
+- Reviewed and integrated PR #1 and PR #2, including regression tests for client/server contracts and monitor/session behavior.
+- Replaced the tabbed controls with simultaneously visible pattern controls and adjustable UI scaling. All five previews follow the selected screen's aspect ratio; inactive patterns use a translucent, resolution-dependent `Off` overlay.
+- Moved bits-per-channel information into physical monitor details. Magnification aligns with the other modification inputs.
+- Added asynchronous pattern calculation with coalescing of pending edits and rejection of stale results.
+- Synchronized remote Zernike and modification parameters with the UI. Remote shifts expand the local slider range when needed; slider max shift has no HEROS setter.
+- Consolidated shared client/server phase and file helpers, bounded notebook preview sampling, and made pattern flip mapping explicit.
+- Added output focus prevention and Windows Aero Peek exclusions. Native desktop behavior still needs platform testing.
+- Added geometry/DPI change handling and session resizing. A changed output resolution resets patterns and optical parameters; unchanged geometry retains the current session.
+- Retained HEROS connection functionality and configuration support while removing the unstable connection toggle from the UI.
 
-### TODO Future Ideas
-- Support SLM with different bit depth than 8
-- Connection via Rest Api toggleable
-- README: "Changing monitor settings while the application is running, such as display scaling, is not detected by refresh." might be wrong
+## Open tasks
 
-### TODO put into README
+- Improve the current overlap between the Enable SLM output button and the output preview. Scaling down the preview is undesirable here, so an overlap can be a reasonable solution; the current implementation of that overlap needs improvement. Leave the UI unchanged until this design is revisited.
+- Stabilize the HEROS connection toggle before exposing it in the user interface again.
+- Consider a warning when a monitor reports more than 8 bits per channel. The value is displayed, but the software output remains 8-bit and currently has no such warning.
+- Add more end-to-end usage examples; existing client examples are in [client/src/examples](../client/src/examples).
 
-- Examples
-- Monitor UID, Herosname should be the same for a given combination of pc + monitor + used port
-- Explain why Screen and Monitor are different and have a manyto one relation
+## Known limitations and validation needs
 
-### Known Issues - Won't Fix
+- Native dimensions are derived from Qt geometry multiplied by device pixel ratio. Geometry/DPI signals and refresh trigger rescans, but aggressive or fractional OS scaling can still produce platform-specific problems. Verify both resolution changes and the resulting pattern reset on real hardware.
+- Linux EDID-to-screen mapping depends on the desktop/compositor and needs further testing with multiple and mirrored monitors. Missing or duplicate metadata can prevent reliable identification.
+- Screen IDs include host and monitor/connector information. They are intended to remain stable for an unchanged setup, but are not guaranteed hardware identifiers; moving ports or changing available metadata can change them.
+- Verify output focus prevention on Linux and Windows and Aero Peek exclusions on Windows. These require a native desktop session.
 
-- Device Height x Width are calculated as geometry Height / Width times devicePixelRatio (induced by scaling from OS settings).
-  → Aggressive scaling or fractional scaling can cause problems here.
-- Changing monitor settings while program is active (e.g. changing scale) will not be detected even when pressing refresh button.
+## Future ideas
+
+- Support output precision above 8 bits per channel.
+- Optional REST API access.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from threading import Lock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -15,6 +15,7 @@ class PatternActivationTest(unittest.TestCase):
         self.manager = object.__new__(HologramManager)
         self.manager.shape = (4, 4)
         self.manager._lock = Lock()
+        self.manager._bridge = Mock()
         self.manager._includeCorrectionPattern = False
         self.manager._includeHologramPattern = False
         self.manager._includeZernikePattern = False
@@ -55,6 +56,9 @@ class PatternActivationTest(unittest.TestCase):
         self.assertEqual(self.manager._zernike_aberrations["defocus"], 1.25)
         self.assertTrue(self.manager.getPatternInclusion()["zernike"])
         self.assertEqual(self.manager._zernikePattern.shape, self.manager.shape)
+        self.manager._bridge.notify_parameters_changed.assert_called_once_with(
+            "zernike", {"defocus": 1.25, "primary spherical": 0.0},
+        )
 
     def test_unavailable_zernike_aberration_is_rejected_without_change(self) -> None:
         with patch("moretzslmcontrol.hologram_manager.zernike_order", 3):
@@ -78,6 +82,21 @@ class PatternActivationTest(unittest.TestCase):
         np.testing.assert_array_equal(exported_correction, correction)
         np.testing.assert_array_equal(exported_hologram, hologram)
 
+
+    def test_each_component_flip_roundtrips_and_rejects_invalid_controls(self) -> None:
+        original = np.arange(12, dtype=np.float32).reshape(3, 4)
+        for component in ('correction', 'hologram', 'modification'):
+            for direction, axis in (('horizontal', 1), ('vertical', 0)):
+                with self.subTest(component=component, direction=direction):
+                    setattr(self.manager, f'_{component}Pattern', original.copy())
+                    self.manager._set_pattern_flip(component, direction, True, False)
+                    np.testing.assert_array_equal(getattr(self.manager, f'_{component}Pattern'), np.flip(original, axis=axis))
+                    self.manager._set_pattern_flip(component, direction, False, False)
+                    np.testing.assert_array_equal(getattr(self.manager, f'_{component}Pattern'), original)
+        with self.assertRaises(ValueError):
+            self.manager._set_pattern_flip('unknown', 'horizontal', True, False)
+        with self.assertRaises(ValueError):
+            self.manager._set_pattern_flip('hologram', 'diagonal', True, False)
 
 if __name__ == "__main__":
     unittest.main()

@@ -598,13 +598,14 @@ wheels = [
 
 [[package]]
 name = "moretzslmcontrol"
-version = "0.3.4.post2"
+version = "0.3.5"
 source = { editable = "." }
 dependencies = [
     { name = "colorlog" },
     { name = "heros" },
     { name = "ipykernel" },
     { name = "matplotlib" },
+    { name = "moretzslmcontrol-client" },
     { name = "mypy" },
     { name = "numpy" },
     { name = "pillow" },
@@ -625,6 +626,7 @@ requires-dist = [
     { name = "heros", specifier = ">=0.13.3" },
     { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
+    { name = "moretzslmcontrol-client", editable = "client" },
     { name = "mypy", specifier = ">=2.3.0" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "pillow", specifier = ">=12.3.0" },
@@ -636,6 +638,27 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.15.22" }]
+
+[[package]]
+name = "moretzslmcontrol-client"
+version = "0.3.5"
+source = { editable = "client" }
+dependencies = [
+    { name = "heros" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pillow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "heros", specifier = ">=0.13.3" },
+    { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=7.4.0" },
+    { name = "matplotlib", specifier = ">=3.11.1" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pillow", specifier = ">=12.3.0" },
+]
+provides-extras = ["notebook"]
 
 [[package]]
 name = "mypy"

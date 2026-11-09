@@ -39,7 +39,7 @@ def importNpyHologram(path: Path | str) -> NDArray[np.float32]:
 
 def importBmpHologram(path: Path | str) -> NDArray[np.float32]:
     """
-    Imports a hologram from a .npy file. Returns hologram as a 2D numpy array in range -pi to pi.
+    Imports an 8-bit grayscale BMP as a float32 phase pattern in radians.
     """
     path = Path(path)
     if path.suffix.lower() != ".bmp":

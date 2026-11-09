@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from math import floor, log10
+from math import ceil, floor, log10
 from html import escape
 from pathlib import Path
 from threading import Thread
@@ -18,8 +18,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
+from sys import platform
+
+from PySide6.QtGui import QCloseEvent, QDoubleValidator, QImage, QPixmap, QShortcut, QKeySequence, QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QApplication,
@@ -31,12 +33,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QLayout,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QSplitter,
+    QSizePolicy,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -57,7 +61,7 @@ from moretzslmcontrol.util.config_file import (
 )
 from moretzslmcontrol.util.patterns.pattern_modification import makeSlmPhaseForSingleFocalSpot
 from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, zernike_modes, zernike_order
-from moretzslmcontrol.userinterface.ui_util.cross_out_preview import cross_out_preview
+from moretzslmcontrol.userinterface.ui_util.cross_out_preview import disabled_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 
 if TYPE_CHECKING:
@@ -88,9 +92,12 @@ class MainWindow(QMainWindow):
         self._loaded_pattern_paths: dict[str, dict[str, str]] = {}
         self._pattern_path_fields: dict[str, QLineEdit] = {}
         self._preview_labels: dict[str, QLabel] = {}
+        self._preview_aspect_ratio = 16 / 9
         self._shift_sliders: dict[str, DeferredWheelSlider] = {}
         self._shift_inputs: dict[str, QLineEdit] = {}
+        self._shift_update_timers: dict[str, QTimer] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
+        self._modification_unit_labels: dict[str, QLabel] = {}
         self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
         self._default_modification_inputs: dict[str, str] = {}
         self._modification_screen_uid: str | None = None
@@ -105,15 +112,22 @@ class MainWindow(QMainWindow):
         self._calculation_status_labels: dict[str, QLabel] = {}
         self._pattern_calculation_revisions: dict[tuple[str, str], int] = {}
         self._pending_pattern_calculations: set[tuple[str, str]] = set()
+        self._running_pattern_calculations: set[tuple[str, str]] = set()
+        self._queued_pattern_calculations: dict[tuple[str, str], tuple[Any, ...]] = {}
+        self._closing = False
         self._pattern_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pattern-calculation")
         self._console_screen_uid: str | None = None
         self._monitor_manager.recordsChanged.connect(self.refresh_views)
         self._monitor_manager.consoleChanged.connect(self._on_console_changed)
+        self._monitor_manager.screenGeometryChanged.connect(self._discard_session_state)
+        self._monitor_manager.parametersChanged.connect(self._on_remote_parameters_changed)
         self.patternCalculationFinished.connect(self._on_pattern_calculation_finished)
 
         self.setWindowTitle("SLM Display Control")
-        self.resize(1550, 880)
-        self.setMinimumSize(1280, 780)
+        self._ui_scale = 1.0
+        self._base_fonts: dict[QWidget, Any] = {}
+        self._base_minimum_sizes: dict[QWidget, Any] = {}
+        self._base_layout_metrics: dict[QLayout, tuple[Any, int]] = {}
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
@@ -136,6 +150,19 @@ class MainWindow(QMainWindow):
         refresh_button = QPushButton("Refresh")
         refresh_button.clicked.connect(self._monitor_manager.rescan_screens)
         sidebar_layout.addWidget(refresh_button)
+        scale_row = QHBoxLayout()
+        scale_row.addWidget(QLabel("Scale UI"))
+        self._scale_label = QLabel("100%")
+        self._scale_down_button = QPushButton("-")
+        self._scale_up_button = QPushButton("+")
+        self._scale_down_button.setToolTip("Decrease UI scale (Ctrl+-)")
+        self._scale_up_button.setToolTip("Increase UI scale (Ctrl++)")
+        self._scale_down_button.clicked.connect(lambda: self._change_ui_scale(-0.05))
+        self._scale_up_button.clicked.connect(lambda: self._change_ui_scale(0.05))
+        scale_row.addWidget(self._scale_down_button)
+        scale_row.addWidget(self._scale_label)
+        scale_row.addWidget(self._scale_up_button)
+        sidebar_layout.addLayout(scale_row)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.VLine)
@@ -150,6 +177,29 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self._content_stack, 1)
         self.setCentralWidget(central_widget)
 
+        self._scale_shortcuts = [
+            QShortcut(QKeySequence("Ctrl+-"), self),
+            QShortcut(QKeySequence("Ctrl++"), self),
+        ]
+        self._scale_shortcuts[0].activated.connect(lambda: self._change_ui_scale(-0.05))
+        self._scale_shortcuts[1].activated.connect(lambda: self._change_ui_scale(0.05))
+        for widget in [*self.findChildren(QWidget), self]:
+            self._base_fonts[widget] = widget.font()
+            self._base_minimum_sizes[widget] = widget.minimumSize()
+        for child_layout in self.findChildren(QLayout):
+            self._base_layout_metrics[child_layout] = (child_layout.contentsMargins(), child_layout.spacing())
+        screen = QApplication.primaryScreen()
+        available = screen.availableGeometry().size() if screen else self.sizeHint()
+        frame_allowance = 52 if platform == "win32" else 0
+        window_height = min(880, max(480, available.height() - frame_allowance))
+        self.resize(min(1550, available.width()), window_height)
+        self.setFixedSize(self.size())
+        initial_scale = min(1.0, max(0.55, (window_height - 30) / 1050))
+        initial_scale = int(initial_scale * 20) / 20
+        while self._ui_scale > initial_scale + 0.001:
+            self._change_ui_scale(-0.05)
+
+        self._change_ui_scale(0)
         self.refresh_views()
 
     def refresh_views(self) -> None:
@@ -166,8 +216,50 @@ class MainWindow(QMainWindow):
             self._list_widget.setCurrentRow(0)
         self._update_selected_screen()
 
+    def _change_ui_scale(self, delta: float) -> None:
+        self._ui_scale = min(1.0, max(0.55, round(self._ui_scale + delta, 2)))
+        for key in ("base", "hologram", "zernike", "modification"):
+            self._preview_labels[key].setMaximumWidth(16777215)
+        element_scale = self._ui_scale * 0.9
+        for widget, base_font in self._base_fonts.items():
+            font = QFont(base_font)
+            if font.pointSizeF() > 0:
+                font.setPointSizeF(max(5.0, font.pointSizeF() * self._ui_scale))
+                widget.setFont(font)
+            base_size = self._base_minimum_sizes[widget]
+            widget.setMinimumSize(round(base_size.width() * element_scale), round(base_size.height() * element_scale))
+        for child_layout, (margins, spacing) in self._base_layout_metrics.items():
+            child_layout.setContentsMargins(
+                round(margins.left() * element_scale),
+                round(margins.top() * element_scale),
+                round(margins.right() * element_scale),
+                round(margins.bottom() * element_scale),
+            )
+            if spacing >= 0:
+                child_layout.setSpacing(round(spacing * element_scale))
+        self._scale_label.setText(f"{self._ui_scale:.0%}")
+        self._screen_title.setStyleSheet(
+            f"font-size: {20 * self._ui_scale:g}px; font-weight: 600;"
+        )
+        QTimer.singleShot(0, self._equalize_pattern_previews)
+
+    def _equalize_pattern_previews(self) -> None:
+        previews = [self._preview_labels[key] for key in ("base", "hologram", "zernike", "modification")]
+        common_width = min(preview.width() for preview in previews)
+        for preview in previews:
+            preview.setFixedWidth(common_width)
+        self._fit_preview_aspect_ratios()
+
+    def _fit_preview_aspect_ratios(self) -> None:
+        """Make every preview surface match the selected monitor's native shape."""
+        for preview in self._preview_labels.values():
+            if preview.width() > 0:
+                preview.setFixedHeight(max(1, round(preview.width() / self._preview_aspect_ratio)))
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Exit the application even when fullscreen SLM output windows remain open."""
+        self._closing = True
+        self._queued_pattern_calculations.clear()
         self._pattern_executor.shutdown(wait=False, cancel_futures=True)
         if self._on_close_requested is not None:
             self._on_close_requested()
@@ -194,7 +286,10 @@ class MainWindow(QMainWindow):
         self._screen_title = QLabel("Screen settings")
         self._screen_title.setStyleSheet("font-size: 20px; font-weight: 600;")
         self._slm_window_button = QPushButton()
-        self._slm_window_button.setFixedHeight(52)
+        self._slm_window_button.setMinimumHeight(36)
+        self._slm_window_button.setCheckable(True)
+        self._slm_output_status = QLabel("Output off")
+        self._slm_output_status.setAccessibleName("SLM output state")
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
@@ -211,10 +306,14 @@ class MainWindow(QMainWindow):
         information_row = QHBoxLayout()
         information_row.setSpacing(12)
         screen_information = self._build_screen_information_group()
-        screen_information.setMinimumWidth(360)
-        information_row.addWidget(screen_information)
-        information_row.addWidget(self._build_monitor_information_group(), 1)
-        information_row.addWidget(self._build_applied_hologram_group())
+        screen_information.setMinimumWidth(300)
+        information_row.addWidget(screen_information, 1)
+        monitor_information = self._build_monitor_information_group()
+        information_row.addWidget(monitor_information, 2)
+        applied_preview = self._build_applied_hologram_group()
+        information_row.addWidget(applied_preview, 1)
+        monitor_information.setMaximumHeight(220)
+        applied_preview.setMaximumHeight(220)
         page_layout.addLayout(information_row)
         lower_splitter = QSplitter(Qt.Orientation.Vertical)
         lower_splitter.setChildrenCollapsible(False)
@@ -222,15 +321,16 @@ class MainWindow(QMainWindow):
         lower_splitter.addWidget(self._build_console_group())
         lower_splitter.setStretchFactor(0, 1)
         lower_splitter.setStretchFactor(1, 0)
-        lower_splitter.setSizes([800, 110])
+        lower_splitter.setSizes([280, 120])
         page_layout.addWidget(lower_splitter, 2)
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:
         group = QGroupBox("Hologram Preview")
-        group.setMinimumWidth(280)
+        group.setMinimumWidth(260)
         layout = QVBoxLayout(group)
-        layout.addWidget(self._build_pattern_component(None, component_key="total"))
+        layout.addWidget(self._slm_output_status)
+        layout.addWidget(self._build_pattern_component(None, component_key="total"), 1)
         return group
 
     def _build_screen_information_group(self) -> QGroupBox:
@@ -242,7 +342,6 @@ class MainWindow(QMainWindow):
             ("screen_name", "Screen name"),
             ("resolution", "Resolution"),
             ("screen_uid", "Screen UID"),
-            ("heros_name", "Hero name"),
             ("screen_connection", "Screen connection"),
             ("slm_window", "SLM window"),
         ):
@@ -250,6 +349,9 @@ class MainWindow(QMainWindow):
             value.setWordWrap(True)
             self._screen_info_fields[key] = value
             layout.addRow(f"{label}:", value)
+        heros_name = self._new_information_label()
+        self._screen_info_fields["heros_name"] = heros_name
+        layout.addRow("Hero name:", heros_name)
         return group
 
     def _build_monitor_information_group(self) -> QGroupBox:
@@ -281,6 +383,7 @@ class MainWindow(QMainWindow):
                 ("manufactured", "Year / Week"),
                 ("name", "Name"),
                 ("serial", "Serial"),
+                ("bits_per_channel", "Bits per channel"),
             ):
                 value = self._new_information_label()
                 value.setWordWrap(True)
@@ -298,34 +401,29 @@ class MainWindow(QMainWindow):
 
     def _build_pattern_group(self) -> QGroupBox:
         group = QGroupBox("Pattern composition")
-        layout = QHBoxLayout(group)
-        layout.setSpacing(8)
-
-        layout.addWidget(
-            self._build_pattern_component(
-                "Correction Pattern", component_key="base", has_file_selector=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component("Hologram Pattern", component_key="hologram", has_file_selector=True),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Zernike Pattern", component_key="zernike", has_zernike_fields=True
-            ),
-            1,
-        )
-        layout.addWidget(self._build_operator_label("+"))
-        layout.addWidget(
-            self._build_pattern_component(
-                "Modification Pattern", component_key="modification", has_shift_controls=True
-            ),
-            1,
-        )
+        grid = QGridLayout(group)
+        grid.setRowStretch(1, 1)
+        for index, (title, key, options) in enumerate((
+            ("Correction", "base", {"has_file_selector": True}),
+            ("Hologram", "hologram", {"has_file_selector": True}),
+            ("Zernike", "zernike", {"has_zernike_fields": True}),
+            ("Modification", "modification", {"has_shift_controls": True}),
+        )):
+            column = index * 2
+            controls = self._build_pattern_component(None, component_key=key, **options)
+            preview = self._preview_labels[key]
+            controls.layout().removeWidget(preview)
+            preview.setMinimumSize(0, 40)
+            preview.setMaximumSize(16777215, 16777215)
+            preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+            grid.addWidget(QLabel(title), 0, column)
+            grid.addWidget(preview, 1, column)
+            grid.addWidget(controls, 2, column, alignment=Qt.AlignmentFlag.AlignTop)
+            grid.setColumnStretch(column, 1)
+            if index < 3:
+                operator = QLabel("+")
+                operator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                grid.addWidget(operator, 1, column + 1)
         return group
 
     def _build_pattern_component(
@@ -349,11 +447,17 @@ class MainWindow(QMainWindow):
 
         preview = QLabel("Preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        preview.setFixedHeight(90)
-        preview.setStyleSheet("color: #d0d0d0;")
+        if component_key == "total":
+            preview.setMinimumHeight(round(45 * self._ui_scale))
+            preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        else:
+            preview.setFixedHeight(round(45 * self._ui_scale))
+            preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        preview.setScaledContents(True)
+        preview.setForegroundRole(preview.foregroundRole())
         if component_key is not None:
             self._preview_labels[component_key] = preview
-        layout.addWidget(preview)
+        layout.addWidget(preview, 1 if component_key == "total" else 0)
 
         if component_key != "total":
             enabled = QCheckBox("Active")
@@ -412,7 +516,8 @@ class MainWindow(QMainWindow):
         if has_zernike_fields:
             layout.addLayout(self._build_zernike_parameter_fields())
 
-        layout.addStretch()
+        if component_key != "total":
+            layout.addStretch()
         return component
 
     @staticmethod
@@ -523,6 +628,7 @@ class MainWindow(QMainWindow):
                 "physical_size_mm": [record.physical_size_x, record.physical_size_y],
             },
             "controls": {
+                "connections": {"heros": displayer.isHeroEnabled()},
                 "pattern_inclusion": displayer.getPatternInclusion(),
                 "flips": self._flip_state_mapping(flip_states),
                 "modification": self._modification_inputs_by_screen[record.screen_uid],
@@ -609,6 +715,7 @@ class MainWindow(QMainWindow):
             controls["pattern_inclusion"], ("base", "hologram", "zernike", "modification"), "pattern inclusion"
         )
         flips = self._configuration_flip_mapping(controls["flips"])
+        connections = self._configuration_bool_mapping(controls.get("connections", {"heros": True}), ("heros",), "connections")
 
         correction: NDArray[np.float32] | None = None
         hologram: NDArray[np.float32] | None = None
@@ -620,6 +727,7 @@ class MainWindow(QMainWindow):
             if correction.shape != expected_shape or hologram.shape != expected_shape:
                 raise ValueError("Configuration pattern dimensions do not match the selected SLM")
 
+        self._monitor_manager.set_heros_enabled(screen_uid, connections["heros"])
         self._modification_inputs_by_screen[screen_uid] = modification_inputs
         self._zernike_inputs_by_screen[screen_uid] = zernike_inputs
         self._load_modification_inputs(screen_uid)
@@ -815,7 +923,7 @@ class MainWindow(QMainWindow):
         patterns = dict(
             zip(
                 ("base", "hologram", "zernike", "modification", "total"),
-                displayer.getPatternSnapshots(),
+                displayer.getPreviewPatternSnapshots(),
                 strict=True,
             )
         )
@@ -828,19 +936,22 @@ class MainWindow(QMainWindow):
             "modification": inclusion["modification"],
             "total": session is not None and self._is_slm_window_enabled(session.state),
         }
+        height, width = patterns["total"].shape
+        self._preview_aspect_ratio = width / height
         for component_key, pattern in patterns.items():
             self._set_preview_image(
                 self._preview_labels[component_key], pattern, active=active_by_component[component_key]
             )
+        QTimer.singleShot(0, self._fit_preview_aspect_ratios)
 
     @staticmethod
     def _set_preview_image(
         preview: QLabel, pattern: NDArray[np.float32], *, active: bool = True
     ) -> None:
         height, width = pattern.shape
-        max_width = max(1, min(preview.width(), 240))
-        max_height = max(1, min(preview.height(), 90))
-        scale = min(max_width / width, max_height / height, 1.0)
+        max_width = max(1, min(preview.width(), 800))
+        max_height = max(1, min(preview.height(), 800))
+        scale = min(max_width / width, max_height / height)
         target_width = max(1, round(width * scale))
         target_height = max(1, round(height * scale))
         row_indices = np.linspace(0, height - 1, target_height, dtype=np.intp)
@@ -848,7 +959,7 @@ class MainWindow(QMainWindow):
         preview_phase = np.ascontiguousarray(pattern[row_indices][:, column_indices], dtype=np.float32)
         preview_bytes = phaseToByte(preview_phase)
         if not active:
-            preview_bytes = cross_out_preview(preview_bytes)
+            preview_bytes = disabled_preview(preview_bytes)
         image = QImage(
             preview_bytes.data,
             target_width,
@@ -900,18 +1011,31 @@ class MainWindow(QMainWindow):
             f'[{escape(timestamp)}] <span style="color: {color};">{label}</span>: {escape(message)}'
         )
 
+    @staticmethod
+    def _size_numeric_field(field: QLineEdit) -> None:
+        metrics = field.fontMetrics()
+        field.setMinimumHeight(round(metrics.height() * 1.8))
+        field.setMinimumWidth(metrics.horizontalAdvance("-0.00000000") + 20)
+        field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
     def _build_shift_row(self, axis: str) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(4)
         slider = DeferredWheelSlider(Qt.Orientation.Horizontal)
         slider.setRange(-200, 200)
         value_input = QLineEdit("0")
-        value_input.setMaximumWidth(46)
+        self._size_numeric_field(value_input)
         value_input.setAlignment(Qt.AlignmentFlag.AlignRight)
         value_input.setValidator(QDoubleValidator(value_input))
         unit_label = QLabel("µm")
         self._shift_sliders[axis] = slider
         self._shift_inputs[axis] = value_input
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(150)
+        timer.timeout.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
+        self._shift_update_timers[axis] = timer
+        slider.valueChanged.connect(lambda _value, selected_axis=axis: self._on_shift_value_changed(selected_axis))
         slider.sliderReleased.connect(lambda selected_axis=axis: self._on_shift_slider_released(selected_axis))
         slider.wheelFinished.connect(
             lambda selected_axis=axis: self._on_shift_slider_released(selected_axis)
@@ -966,9 +1090,10 @@ class MainWindow(QMainWindow):
             ),
         ):
             field = QLineEdit(default_value)
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(_tooltip)
             self._modification_parameter_fields[key] = field
             if key == "max_shift":
                 field.editingFinished.connect(self._on_max_shift_edited)
@@ -979,8 +1104,13 @@ class MainWindow(QMainWindow):
             field_layout.setContentsMargins(0, 0, 0, 0)
             field_layout.setSpacing(4)
             field_layout.addWidget(field)
-            if unit:
-                field_layout.addWidget(QLabel(unit))
+            unit_label = QLabel(unit or "µm")
+            unit_label.setFixedWidth(field.fontMetrics().horizontalAdvance("µm"))
+            if not unit:
+                # Reserve the unit column so unitless fields align with neighboring inputs.
+                unit_label.setStyleSheet("color: transparent;")
+            self._modification_unit_labels[key] = unit_label
+            field_layout.addWidget(unit_label)
             field_layout.addStretch()
             form.addRow(f"{label}:", field_row)
         return form
@@ -990,22 +1120,52 @@ class MainWindow(QMainWindow):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        row = 0
-        for name, (order, _azimuthal_order) in zernike_modes.items():
+        index = 0
+        paired_names = (
+            "defocus", "primary spherical", "asti 0", "asti 45", "coma 0", "coma 90",
+            "trefoil 0", "trefoil 90", "asti 2nd 0", "asti 2nd 45",
+        )
+        ordered_names = [*paired_names, *(name for name in zernike_modes if name not in paired_names)]
+        for name in ordered_names:
+            if name not in zernike_modes:
+                continue
+            order, _azimuthal_order = zernike_modes[name]
             if order > zernike_order:
                 continue
             field = QLineEdit("0")
-            field.setMaximumWidth(70)
+            self._size_numeric_field(field)
             field.setAlignment(Qt.AlignmentFlag.AlignRight)
             field.setValidator(QDoubleValidator(field))
+            field.setToolTip(f"{name}: Zernike phase coefficient (radians). Radial order {order}.")
             field.editingFinished.connect(self._update_zernike_pattern)
             self._zernike_parameter_fields[name] = field
-            grid.addWidget(QLabel(f"{name}:"), row, 0, alignment=Qt.AlignmentFlag.AlignRight)
-            grid.addWidget(field, row, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-            row += 1
+            column = index % 2
+            row = index // 2
+            cell = QWidget()
+            cell_layout = QVBoxLayout(cell)
+            cell_layout.setContentsMargins(1, 0, 1, 0)
+            cell_layout.setSpacing(0)
+            label = QLabel(name)
+            label.setToolTip(field.toolTip())
+            cell_layout.addWidget(label)
+            field.setMinimumWidth(48)
+            cell_layout.addWidget(field)
+            grid.addWidget(cell, row, column)
+            index += 1
         return grid
 
+    def _on_shift_value_changed(self, axis: str) -> None:
+        try:
+            maximum = self._read_positive_modification_parameter("max_shift")
+        except ValueError:
+            return
+        slider = self._shift_sliders[axis]
+        self._shift_inputs[axis].setText(self._format_number(slider.value() * self._slider_tick_size(maximum)))
+        if not slider.isSliderDown():
+            self._shift_update_timers[axis].start()
+
     def _on_shift_slider_released(self, axis: str) -> None:
+        self._shift_update_timers[axis].stop()
         try:
             maximum_shift = self._read_positive_modification_parameter("max_shift")
         except ValueError as error:
@@ -1053,7 +1213,7 @@ class MainWindow(QMainWindow):
             return
 
         tick_size = self._slider_tick_size(maximum_shift)
-        slider_limit = floor(maximum_shift / tick_size)
+        slider_limit = ceil(maximum_shift / tick_size)
         for axis, slider in self._shift_sliders.items():
             slider.blockSignals(True)
             slider.setRange(-slider_limit, slider_limit)
@@ -1085,7 +1245,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = (x, y, z, wavelength, focal_length, magnification, pixel_pitch)
-        if self._last_modification_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "modification"
+        if (self._last_modification_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1124,7 +1287,10 @@ class MainWindow(QMainWindow):
             return
 
         parameters = tuple(aberrations.values())
-        if self._last_zernike_parameters.get(screen_uid) == parameters:
+        key = screen_uid, "zernike"
+        if (self._last_zernike_parameters.get(screen_uid) == parameters
+                and key not in self._pending_pattern_calculations
+                and key not in self._running_pattern_calculations):
             return
 
         displayer = self._monitor_manager.ensure_displayer(screen_uid)
@@ -1156,6 +1322,15 @@ class MainWindow(QMainWindow):
         self._pattern_calculation_revisions[key] = revision
         self._pending_pattern_calculations.add(key)
         self._refresh_calculation_status()
+        request = (revision, parameters, calculation, arguments)
+        if key in self._running_pattern_calculations:
+            self._queued_pattern_calculations[key] = request
+            return
+        self._submit_pattern_calculation(screen_uid, component, request)
+
+    def _submit_pattern_calculation(self, screen_uid: str, component: str, request: tuple[Any, ...]) -> None:
+        revision, parameters, calculation, arguments = request
+        self._running_pattern_calculations.add((screen_uid, component))
         future = self._pattern_executor.submit(calculation, *arguments)
         future.add_done_callback(
             lambda completed, uid=screen_uid, kind=component, request_revision=revision, request_parameters=parameters: self._report_pattern_calculation(
@@ -1175,7 +1350,8 @@ class MainWindow(QMainWindow):
             result: object = future.result()
         except Exception as error:
             result = error
-        self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
+        if not self._closing:
+            self.patternCalculationFinished.emit(screen_uid, component, revision, (parameters, result))
 
     @staticmethod
     def _calculate_modification_pattern(
@@ -1221,7 +1397,12 @@ class MainWindow(QMainWindow):
         revision: int,
         payload: object,
     ) -> None:
-        if self._pattern_calculation_revisions.get((screen_uid, component)) != revision:
+        key = screen_uid, component
+        self._running_pattern_calculations.discard(key)
+        queued = self._queued_pattern_calculations.pop(key, None)
+        if queued is not None and not self._closing:
+            self._submit_pattern_calculation(screen_uid, component, queued)
+        if self._closing or self._pattern_calculation_revisions.get(key) != revision:
             return
         self._pending_pattern_calculations.discard((screen_uid, component))
         self._refresh_calculation_status()
@@ -1235,6 +1416,7 @@ class MainWindow(QMainWindow):
         try:
             if component == "modification":
                 displayer.setModificationPattern(result)
+                displayer.rememberModificationParameters(parameters)
                 self._last_modification_parameters[screen_uid] = parameters
             else:
                 cart_grid, pattern, aberrations = result
@@ -1246,6 +1428,40 @@ class MainWindow(QMainWindow):
             self._write_console_for_screen(screen_uid, f"Error: could not apply {component} pattern: {error}")
             return
         if screen_uid == self._selected_screen_uid():
+            self.updatePreview()
+
+    @Slot(str, str, object)
+    def _on_remote_parameters_changed(self, screen_uid: str, component: str, values: dict[str, float]) -> None:
+        """Synchronize remote changes on the GUI thread and discard obsolete GUI work."""
+        key = screen_uid, component
+        self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
+        self._queued_pattern_calculations.pop(key, None)
+        self._pending_pattern_calculations.discard(key)
+        selected = screen_uid == self._selected_screen_uid()
+        if component == "zernike":
+            inputs = {**self._zernike_inputs_by_screen.get(screen_uid, self._default_zernike_inputs),
+                      **{name: self._format_number(value) for name, value in values.items()}}
+            self._zernike_inputs_by_screen[screen_uid] = inputs
+            self._last_zernike_parameters.pop(screen_uid, None)
+            if selected:
+                self._load_zernike_inputs(screen_uid)
+        else:
+            inputs = dict(self._modification_inputs_by_screen.get(screen_uid, self._default_modification_inputs))
+            if selected:
+                inputs.update(self._modification_input_values())
+                for axis, slider in self._shift_sliders.items():
+                    slider.cancel_pending_wheel_update()
+                    self._shift_update_timers[axis].stop()
+            inputs.update({name: self._format_number(value) for name, value in values.items()})
+            maximum = max(float(inputs["max_shift"]), *(abs(float(inputs[axis])) for axis in ("X", "Y", "Z")))
+            inputs["max_shift"] = self._format_number(maximum)
+            self._modification_inputs_by_screen[screen_uid] = inputs
+            self._last_modification_parameters.pop(screen_uid, None)
+            if selected:
+                self._load_modification_inputs(screen_uid)
+        self._refresh_calculation_status()
+        if selected:
+            self._sync_pattern_active_checks(screen_uid)
             self.updatePreview()
 
     def _refresh_calculation_status(self) -> None:
@@ -1294,7 +1510,7 @@ class MainWindow(QMainWindow):
             tick_size = self._slider_tick_size(maximum_shift)
         except ValueError:
             return
-        slider_limit = floor(maximum_shift / tick_size)
+        slider_limit = ceil(maximum_shift / tick_size)
         for axis, slider in self._shift_sliders.items():
             slider.blockSignals(True)
             slider.setRange(-slider_limit, slider_limit)
@@ -1345,8 +1561,9 @@ class MainWindow(QMainWindow):
             return
 
         if screen_uid != self._modification_screen_uid:
-            for slider in self._shift_sliders.values():
+            for axis, slider in self._shift_sliders.items():
                 slider.cancel_pending_wheel_update()
+                self._shift_update_timers[axis].stop()
             if self._modification_screen_uid is not None:
                 self._store_modification_inputs(self._modification_screen_uid)
             self._load_modification_inputs(screen_uid)
@@ -1447,6 +1664,9 @@ class MainWindow(QMainWindow):
         fields["manufactured"].setText(f"{edid.year} / {edid.week}")
         fields["name"].setText(edid.name or "—")
         fields["serial"].setText(str(edid.serial) if edid.serial is not None else "—")
+        fields["bits_per_channel"].setText(
+            str(monitor.bits_per_channel) if monitor.bits_per_channel is not None else "Unknown"
+        )
 
     @staticmethod
     def _screen_connection_text(state: SessionState) -> str:
@@ -1461,16 +1681,13 @@ class MainWindow(QMainWindow):
         return "Disabled"
 
     def _update_slm_window_button(self, state: SessionState) -> None:
-        if self._is_slm_window_enabled(state):
-            self._slm_window_button.setText("SLM WINDOW ON  —  Disable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #1565c0; color: white; font-weight: 700; border-radius: 4px;"
-            )
-        else:
-            self._slm_window_button.setText("SLM WINDOW OFF  —  Enable")
-            self._slm_window_button.setStyleSheet(
-                "background-color: #b71c1c; color: white; font-weight: 700; border-radius: 4px;"
-            )
+        enabled = self._is_slm_window_enabled(state)
+        connected = state in (SessionState.INACTIVE_CONNECTED, SessionState.ACTIVE_CONNECTED)
+        self._slm_window_button.setChecked(enabled)
+        self._slm_window_button.setText("Disable SLM output" if enabled else "Enable SLM output")
+        self._slm_window_button.setEnabled(connected or enabled)
+        self._slm_window_button.setToolTip("Show or hide the native fullscreen SLM output without changing its pattern.")
+        self._slm_output_status.setText("Output on" if enabled and connected else "Output disconnected" if not connected else "Output off")
 
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:
@@ -1526,6 +1743,7 @@ class MainWindow(QMainWindow):
             key = screen_uid, component
             self._pattern_calculation_revisions[key] = self._pattern_calculation_revisions.get(key, 0) + 1
             self._pending_pattern_calculations.discard(key)
+            self._queued_pattern_calculations.pop(key, None)
         self._refresh_calculation_status()
 
     def _selected_screen_uid(self) -> str | None:
