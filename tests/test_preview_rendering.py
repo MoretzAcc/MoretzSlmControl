@@ -20,3 +20,15 @@ class PreviewRenderingTest(unittest.TestCase):
     def test_tiny_preview_remains_valid(self) -> None:
         for shape in ((1, 1), (2, 10), (10, 2)):
             self.assertEqual(disabled_preview(np.zeros(shape, dtype=np.uint8)).shape, shape)
+
+    def test_off_overlay_scales_with_preview_resolution(self) -> None:
+        relative_sizes = []
+        for height, width in ((90, 160), (180, 320), (900, 1600), (2160, 3840)):
+            source = np.full((height, width), 128, dtype=np.uint8)
+            result = disabled_preview(source)
+            rows, columns = np.nonzero(result != source)
+            relative_sizes.append(((columns.max() - columns.min() + 1) / width,
+                                   (rows.max() - rows.min() + 1) / height))
+        for relative_width, relative_height in relative_sizes[1:]:
+            self.assertAlmostEqual(relative_width, relative_sizes[0][0], delta=0.04)
+            self.assertAlmostEqual(relative_height, relative_sizes[0][1], delta=0.04)
