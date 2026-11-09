@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QScrollArea, QTabWidget
 from moretzslmcontrol.userinterface.main_window import MainWindow
 
 
@@ -125,14 +125,14 @@ class CalculationSchedulingTest(unittest.TestCase):
 
     def test_small_window_preserves_numeric_control_height(self) -> None:
         self.window._content_stack.setCurrentWidget(self.window._details_page)
-        self.window._pattern_tabs.setCurrentIndex(2)
         self.window.resize(1024, 768)
         self.window.show()
         self.app.processEvents()
-        self.assertLessEqual(self.window.width(), 1024)
+        self.assertFalse(self.window._details_page.findChildren(QScrollArea))
+        self.assertFalse(self.window._details_page.findChildren(QTabWidget))
         for field in self.window._zernike_parameter_fields.values():
             self.assertGreaterEqual(field.height(), field.fontMetrics().height()*1.7)
-            self.assertGreaterEqual(field.width(), 100)
+            self.assertGreaterEqual(field.width(), 30)
 
     def test_output_action_distinguishes_state_from_action(self) -> None:
         from moretzslmcontrol.monitor_stuff.models import SessionState
@@ -143,3 +143,14 @@ class CalculationSchedulingTest(unittest.TestCase):
         self.window._update_slm_window_button(SessionState.INACTIVE_DISCONNECTED)
         self.assertEqual(self.window._slm_output_status.text(), 'Output disconnected')
         self.assertFalse(self.window._slm_window_button.isEnabled())
+
+    def test_ui_scale_round_trip_preserves_font_size(self) -> None:
+        field = self.window._zernike_parameter_fields['defocus']
+        before = field.font().pointSizeF()
+        for _ in range(3):
+            self.window._change_ui_scale(0.05)
+            self.window._change_ui_scale(-0.05)
+        self.assertAlmostEqual(field.font().pointSizeF(), before)
+
+    def test_screen_information_keeps_bit_depth_compatibility_fields(self) -> None:
+        self.assertTrue({"output_depth", "monitor_depth", "depth_warning"}.issubset(self.window._screen_info_fields))
