@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import tempfile
 from threading import Thread
 import unittest
 from unittest.mock import Mock
@@ -15,6 +17,7 @@ from moretzslmcontrol.control.slm_hero_connector import SlmHeroConnector
 from moretzslmcontrol.hologram_manager import HologramManager
 from moretzslmcontrol.userinterface.display_bridge import DisplayBridge
 from moretzslmcontrol.userinterface.main_window import MainWindow
+from moretzslmcontrol.util.ui_settings import UiSettings
 
 
 class RemoteParametersTest(unittest.TestCase):
@@ -23,11 +26,13 @@ class RemoteParametersTest(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
         self.bridge = DisplayBridge("screen")
         self.displayer = HologramManager(8, 12, "test", "test", self.bridge, Mock(), heros_enabled=False)
         manager = Mock()
         manager.iter_debug_views.return_value = []
-        self.window = MainWindow(manager)
+        self.window = MainWindow(manager, settings_path=Path(self.folder.name) / 'settings.json')
         self.window._selected_screen_uid = lambda: "screen"
         self.window.updatePreview = Mock()
         self.window._sync_pattern_active_checks = Mock()
@@ -48,6 +53,20 @@ class RemoteParametersTest(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(self.window._zernike_parameter_fields["asti 0"].text(), "0.2")
         self.assertTrue(np.any(self.displayer.getPatternSnapshots()[2]))
+
+    def test_ui_scaling_preserves_native_patterns_and_output_bytes(self) -> None:
+        pattern = np.linspace(-np.pi, np.pi, 96, dtype=np.float32).reshape(8, 12)
+        self.displayer.setHologramPattern(pattern)
+        patterns = self.displayer.getPatternSnapshots()
+        revision, frame = self.displayer.getLastFrameSnapshot()
+        self.window._set_ui_settings(UiSettings(global_scale=1.5, font_scale=2, element_scale=0.5, preview_scale=0.5))
+        self.app.processEvents()
+        self.assertEqual(self.displayer.shape, (8, 12))
+        after_revision, after_frame = self.displayer.getLastFrameSnapshot()
+        self.assertEqual(after_revision, revision)
+        np.testing.assert_array_equal(after_frame, frame)
+        for before, after in zip(patterns, self.displayer.getPatternSnapshots(), strict=True):
+            np.testing.assert_array_equal(after, before)
 
     def test_modification_parameters_update_pattern_fields_and_slider_range(self) -> None:
         for suffix, key, value in (

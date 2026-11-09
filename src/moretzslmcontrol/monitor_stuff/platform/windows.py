@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+from weakref import WeakKeyDictionary
 
 import winreg
+from pywintypes import com_error
 
 from PySide6.QtGui import QScreen
 
@@ -27,6 +29,9 @@ if TYPE_CHECKING:  # Type hinting imports in here when cyclic imports occur
 logger = logging.getLogger(__name__)
 
 class WindowsPlatformAdapter(PlatformAdapter):
+    def __init__(self) -> None:
+        self._last_screen_edids: WeakKeyDictionary[QScreen, list[MonitorEdid]] = WeakKeyDictionary()
+
     def get_host_id(self) -> str:
         try:
             with winreg.OpenKey(
@@ -43,9 +48,25 @@ class WindowsPlatformAdapter(PlatformAdapter):
             return ""
 
     def get_screen_edids(self, screen: QScreen) -> list[MonitorEdid]:
-        return [
-            MonitorEdid(os_identifier=win_monitor.instance_name, parsed_edid=win_monitor.parsed_edid, bits_per_channel=edid_bits_per_channel(win_monitor.edid)) for win_monitor in windows_match_edids(screen)
+        try:
+            monitors = windows_match_edids(screen)
+        except com_error as error:
+            # Keep an observed screen's identity during a failed WMI query.
+            # Successful queries always refresh metadata, including replacements.
+            cached = self._last_screen_edids.get(screen, [])
+            fallback = "last successful EDID" if cached else "Qt screen metadata"
+            logger.warning("%s: Windows monitor EDID is unavailable; using %s: %s", screen.name(), fallback, error)
+            return cached
+        edids = [
+            MonitorEdid(
+                os_identifier=monitor.instance_name,
+                parsed_edid=monitor.parsed_edid,
+                bits_per_channel=edid_bits_per_channel(monitor.edid),
+            )
+            for monitor in monitors
         ]
+        self._last_screen_edids[screen] = edids
+        return edids
 
     def attach_window_to_screen(self, window: QWidget, screen: QScreen) -> None:
         super().attach_window_to_screen(window, screen)

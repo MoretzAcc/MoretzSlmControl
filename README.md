@@ -34,9 +34,24 @@ uv run moretzslmcontrol
 1. Select a detected screen from the sidebar.
 2. Enable its SLM output. The control keeps keyboard focus; the native output remains fullscreen.
 3. Load correction and hologram patterns from `.npy` or `.bmp` files.
-4. Edit the Correction, Hologram, Zernike and Modification controls alongside the output preview. Use **Scale UI** in the sidebar or Ctrl+- / Ctrl++ to adjust the interface size.
+4. Edit the Correction, Hologram, Zernike and Modification controls alongside the output preview. Use **Scale UI** in the sidebar or Ctrl+- / Ctrl++ to adjust the global interface scale. The gear button opens live **UI settings** with independent relative factors for font size, UI elements and previews. Each effective factor is the global scale multiplied by its relative factor. New profiles start at 100%; larger controls remain accessible through the scrollable content area.
 5. Slider values update while dragging. Pattern calculation runs asynchronously and combines rapid edits into the newest desired state.
 6. Export configuration to save the session settings and patterns, or import a saved configuration. Current exports use format v2; legacy v1 remains readable.
+
+UI preferences are saved automatically to `~/.config/moretzslmcontrol/settings.json`
+(`C:\Users\<user>\.config\moretzslmcontrol\settings.json` on Windows), and restored at
+startup. A missing file is created with default values; invalid settings are backed
+up before defaults are written. **Restore Defaults** in UI settings resets all four
+factors to 100%. Scaling changes previews and controls, preserving native SLM output
+dimensions and pattern data. Buttons and checkboxes keep a minimum size that fits
+their text when the font factor is larger than the element factor.
+
+Drag the divider beside **Screens** to resize the sidebar. UI scaling preserves
+the sidebar width; its contents scroll if they need more room.
+
+Configuration exports also include the optional `controls.ui` factors. Importing
+them applies and saves the UI preferences immediately. Older v1/v2 configurations
+without that field retain the current UI preferences.
 
 ## HEROS integration
 
