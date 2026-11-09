@@ -1,5 +1,12 @@
 # Fork changelog
 
+## 0.3.5+moretzai.5 — 2026-11-09
+
+- Added a draggable horizontal divider for the screen sidebar. Its width stays
+  independent of UI scaling; sidebar contents scroll when necessary.
+- Removed the nonfunctional divider above the console, including its resize cursor.
+  Pattern composition remains at content height and the console uses spare space.
+
 ## 0.3.5+moretzai.4 — 2026-11-09
 
 - Kept Pattern composition at its content height, recalculating when fonts or

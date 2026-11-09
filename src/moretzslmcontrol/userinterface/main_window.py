@@ -147,7 +147,6 @@ class MainWindow(QMainWindow):
 
         self._list_widget = QListWidget()
         self._list_widget.setMinimumWidth(150)
-        self._list_widget.setMaximumWidth(210)
         self._list_widget.currentItemChanged.connect(self._update_selected_screen)
 
         self._details_page = self._build_details_page()
@@ -187,21 +186,28 @@ class MainWindow(QMainWindow):
         scale_row.addWidget(self._scale_settings_button)
         sidebar_layout.addLayout(scale_row)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.VLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-
         central_widget = QWidget()
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 12, 0)
         main_layout.setSpacing(0)
-        main_layout.addWidget(sidebar)
-        main_layout.addWidget(separator)
+        self._sidebar_scroll = QScrollArea()
+        self._sidebar_scroll.setWidgetResizable(True)
+        self._sidebar_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._sidebar_scroll.setMinimumWidth(120)
+        self._sidebar_scroll.setWidget(sidebar)
         self._content_scroll = QScrollArea()
         self._content_scroll.setWidgetResizable(True)
         self._content_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._content_scroll.setWidget(self._content_stack)
-        main_layout.addWidget(self._content_scroll, 1)
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter.setChildrenCollapsible(False)
+        self._main_splitter.setHandleWidth(5)
+        self._main_splitter.addWidget(self._sidebar_scroll)
+        self._main_splitter.addWidget(self._content_scroll)
+        self._main_splitter.setStretchFactor(0, 0)
+        self._main_splitter.setStretchFactor(1, 1)
+        self._main_splitter.handle(1).setToolTip("Drag to resize the screen sidebar")
+        main_layout.addWidget(self._main_splitter, 1)
         self.setCentralWidget(central_widget)
 
         self._scale_shortcuts = [
@@ -228,6 +234,7 @@ class MainWindow(QMainWindow):
         frame_allowance = 52 if platform == "win32" else 0
         window_height = min(880, max(480, available.height() - frame_allowance))
         self.resize(min(1550, available.width()), window_height)
+        self._main_splitter.setSizes([240, max(1, self.width() - 240)])
         self._apply_ui_scale()
         self.refresh_views()
 
@@ -286,7 +293,8 @@ class MainWindow(QMainWindow):
             minimum_height = round(base_size.height() * element_scale)
             if widget in numeric_fields:
                 minimum_height = max(minimum_height, ceil(widget.fontMetrics().height() * 1.8))
-            widget.setMinimumSize(round(base_size.width() * element_scale), minimum_height)
+            minimum_width = base_size.width() if widget is self._sidebar_scroll else round(base_size.width() * element_scale)
+            widget.setMinimumSize(minimum_width, minimum_height)
             widget.setMaximumSize(
                 round(maximum.width() * element_scale) if maximum.width() < 16777215 else 16777215,
                 round(maximum.height() * element_scale) if maximum.height() < 16777215 else 16777215,
@@ -384,14 +392,13 @@ class MainWindow(QMainWindow):
         applied_preview = self._build_applied_hologram_group()
         information_row.addWidget(applied_preview, 1)
         page_layout.addLayout(information_row)
-        lower_splitter = QSplitter(Qt.Orientation.Vertical)
-        lower_splitter.setChildrenCollapsible(False)
-        lower_splitter.addWidget(self._build_pattern_group())
-        lower_splitter.addWidget(self._build_console_group())
-        lower_splitter.setStretchFactor(0, 0)
-        lower_splitter.setStretchFactor(1, 1)
-        lower_splitter.setSizes([280, 120])
-        page_layout.addWidget(lower_splitter, 2)
+        lower_panel = QWidget()
+        lower_layout = QVBoxLayout(lower_panel)
+        lower_layout.setContentsMargins(0, 0, 0, 0)
+        lower_layout.setSpacing(6)
+        lower_layout.addWidget(self._build_pattern_group())
+        lower_layout.addWidget(self._build_console_group(), 1)
+        page_layout.addWidget(lower_panel, 2)
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:

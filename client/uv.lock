@@ -671,7 +671,7 @@ wheels = [
 
 [[package]]
 name = "moretzslmcontrol-client"
-version = "0.3.5+moretzai.4"
+version = "0.3.5+moretzai.5"
 source = { editable = "." }
 dependencies = [
     { name = "heros" },

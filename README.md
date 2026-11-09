@@ -45,6 +45,9 @@ up before defaults are written. **Restore Defaults** in UI settings resets all f
 factors to 100%. Scaling changes previews and controls, preserving native SLM output
 dimensions and pattern data.
 
+Drag the divider beside **Screens** to resize the sidebar. UI scaling preserves
+the sidebar width; its contents scroll if they need more room.
+
 Configuration exports also include the optional `controls.ui` factors. Importing
 them applies and saves the UI preferences immediately. Older v1/v2 configurations
 without that field retain the current UI preferences.
