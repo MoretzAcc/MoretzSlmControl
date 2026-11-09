@@ -16,6 +16,7 @@ uv run python -m unittest discover -s tests
 ### TODO Tasks
 
 - ! Design: Rework design of the enable / disable window button
+- Improve the current overlap between the Enable SLM output button and the output preview. Scaling down the preview is undesirable here, so an overlap can be a reasonable solution; the current implementation of that overlap needs improvement. Leave the UI unchanged until this design is revisited.
 - Stabilize the HEROS connection toggle before exposing it in the user interface again.
 - remove duplicate code from client and server
 - make plotHologram faster
