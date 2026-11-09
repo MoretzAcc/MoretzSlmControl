@@ -44,6 +44,10 @@ uv run python -m unittest discover -s tests
 - Investigate intermittent Windows hotplug recovery reported during VM testing: an enabled output sometimes needs Refresh to reconnect. This is not fixed by the WMI fallback. Confirm on physical displays before changing topology handling.
 - Distinguish identical monitor names in the sidebar with a connector or short screen identifier.
 
+## Unreleased fixes
+
+- The notched Pattern composition frame renders native Qt group-box sections and lets the active style position and paint its title. Rendering comparisons cover the locally available Windows and Fusion styles, larger fonts, and 100%/150%/200% display scaling; native Windows desktop rendering still needs verification.
+
 ## Known limitations and validation needs
 
 - Native dimensions are derived from Qt geometry multiplied by device pixel ratio. Geometry/DPI signals and refresh trigger rescans, but aggressive or fractional OS scaling can still produce platform-specific problems. Verify both resolution changes and the resulting pattern reset on real hardware.

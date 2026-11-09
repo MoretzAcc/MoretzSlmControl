@@ -1,6 +1,12 @@
 
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Pattern composition now uses the active Qt group-box style for its notched frame and title, matching the other sections on each platform without a custom title cutout.
+
 ## 0.3.6 — 2026-11-09
 
 ### Added

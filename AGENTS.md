@@ -84,3 +84,4 @@ For code changes, use the lightest verification that matches the risk:
 
 - UI preferences live in `~/.config/moretzslmcontrol/settings.json`. Keep global and relative font/element/preview factors independent; UI scaling must never change native SLM buffers or output bytes. Configuration v2 optionally exports these factors as `controls.ui`; legacy files retain current preferences.
 - GUI tests must pass a temporary `settings_path` to MainWindow so they cannot read or overwrite personal UI preferences.
+- Frame rendering comparisons in `tests/test_pattern_frame.py` check the notched Pattern composition group against native group boxes under available Qt styles. Preserve native frame/title rendering when changing that widget.

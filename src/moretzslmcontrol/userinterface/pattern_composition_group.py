@@ -1,8 +1,10 @@
 """Pattern frame with a console fitted into the unused lower-left area."""
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPointF, QRect, QRectF, Qt, QTimer
-from PySide6.QtGui import QPaintEvent, QPainter, QPainterPath, QPalette, QPen, QRegion, QResizeEvent
+from math import ceil
+
+from PySide6.QtCore import QEvent, QPointF, QRect, Qt, QTimer
+from PySide6.QtGui import QPaintEvent, QPainter, QPixmap, QRegion, QResizeEvent
 from PySide6.QtWidgets import QGridLayout, QGroupBox, QLayout, QSizePolicy, QStyle, QStyleOptionGroupBox, QStylePainter, QWidget
 
 
@@ -83,33 +85,49 @@ class PatternCompositionGroup(QGroupBox):
             super().paintEvent(event)
             return
         option, frame = self._frame_option()
-        bounds = QRectF(frame).adjusted(0.5, 0.5, -0.5, -0.5)
-        left, top, right, bottom = bounds.left(), bounds.top(), bounds.right(), bounds.bottom()
-        notch_x, notch_y = self._notch.x(), self._notch.y()
-        radius = min(3.0, (right - notch_x) / 2, (notch_y - top) / 2, (bottom - notch_y) / 2)
-        path = QPainterPath(QPointF(left + radius, top))
-        path.lineTo(right - radius, top)
-        path.quadTo(right, top, right, top + radius)
-        path.lineTo(right, bottom - radius)
-        path.quadTo(right, bottom, right - radius, bottom)
-        path.lineTo(notch_x + radius, bottom)
-        path.quadTo(notch_x, bottom, notch_x, bottom - radius)
-        path.lineTo(notch_x, notch_y + radius)
-        path.quadTo(notch_x, notch_y, notch_x - radius, notch_y)
-        path.lineTo(left + radius, notch_y)
-        path.quadTo(left, notch_y, left, notch_y - radius)
-        path.lineTo(left, top + radius)
-        path.quadTo(left, top, left + radius, top)
-        path.closeSubpath()
-
+        notch_x, notch_y = round(self._notch.x()), round(self._notch.y())
+        # Use the active style for every edge and for the title. In particular,
+        # let Qt decide whether the title interrupts or sits above the border.
+        # A small overlap includes native rounded corners and shaded borders.
+        edge_width = max(4, 2 * self.style().pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, option, self))
+        cutout = QRect(frame.left(), notch_y - edge_width, notch_x - frame.left() + edge_width, frame.bottom() - notch_y + edge_width + 1)
+        horizontal_edge = QRect(frame.left(), notch_y - edge_width, notch_x - frame.left() + 1, edge_width + 1)
+        vertical_edge = QRect(notch_x, notch_y, edge_width + 1, frame.bottom() - notch_y + 1)
         painter = QStylePainter(self)
-        label_rect = self.style().subControlRect(QStyle.ComplexControl.CC_GroupBox, option, QStyle.SubControl.SC_GroupBoxLabel, self)
+        outer = QStyleOptionGroupBox(option)
+        outer.subControls = QStyle.SubControl.SC_GroupBoxFrame
+        self._draw_native_part(painter, outer, QRegion(self.rect()).subtracted(QRegion(cutout)))
+
+        upper = QStyleOptionGroupBox(option)
+        upper.rect.setBottom(notch_y)
+        upper.subControls = QStyle.SubControl.SC_GroupBoxFrame
+        self._draw_native_part(painter, upper, QRegion(horizontal_edge))
+
+        right = QStyleOptionGroupBox(option)
+        right.rect.setLeft(notch_x)
+        right.subControls = QStyle.SubControl.SC_GroupBoxFrame
+        self._draw_native_part(painter, right, QRegion(vertical_edge))
+
+        # Draw text directly on the widget to retain the native font rendering.
+        title = QStyleOptionGroupBox(option)
+        title.subControls = QStyle.SubControl.SC_GroupBoxLabel
+        self.style().drawComplexControl(QStyle.ComplexControl.CC_GroupBox, title, painter, self)
+
+    def _draw_native_part(self, painter: QPainter, option: QStyleOptionGroupBox, region: QRegion) -> None:
+        # Some styles replace the painter clip while drawing the title/frame.
+        # Composite their output afterwards so they cannot repaint the cutout.
+        bounds = region.boundingRect()
+        ratio = self.devicePixelRatioF()
+        layer = QPixmap(ceil(bounds.width() * ratio), ceil(bounds.height() * ratio))
+        layer.setDevicePixelRatio(ratio)
+        layer.fill(Qt.GlobalColor.transparent)
+        native = QPainter(layer)
+        native.setFont(self.font())
+        native.setRenderHints(painter.renderHints())
+        native.translate(-bounds.topLeft())
+        self.style().drawComplexControl(QStyle.ComplexControl.CC_GroupBox, option, native, self)
+        native.end()
         painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setClipRegion(QRegion(self.rect()).subtracted(QRegion(label_rect.adjusted(-2, 0, 2, 0))))
-        painter.setPen(QPen(self.palette().color(QPalette.ColorRole.Mid), 1))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawPath(path)
+        painter.setClipRegion(region)
+        painter.drawPixmap(bounds.topLeft(), layer)
         painter.restore()
-        option.subControls = QStyle.SubControl.SC_GroupBoxLabel
-        painter.drawComplexControl(QStyle.ComplexControl.CC_GroupBox, option)
