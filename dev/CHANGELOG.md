@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.3.6.post1 — Unreleased
+## 0.3.6.post1 — 2026-11-09
 
 ##### Changed:
+- Doubled the size of the Off label in inactive previews.
 - Default Slider max shift is now 100 µm.
 
 ##### Fixed:

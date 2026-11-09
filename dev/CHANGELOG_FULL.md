@@ -3,10 +3,12 @@
 
 User-facing release notes are maintained in [CHANGELOG.md](CHANGELOG.md).
 
-## 0.3.6.post1 — Unreleased
+## 0.3.6.post1 — 2026-11-09
 
 ### Changed
 
+- Doubled the resolution-dependent Off overlay font size, including its minimum size; the background padding scales with the font.
+- Synchronized server and client distribution versions to 0.3.6.post1.
 - Reduced the default Slider max shift from 200 µm to 100 µm; X, Y and Z sliders start with a range of −100 to +100 µm. Imported configurations retain their saved values.
 - Shortened the release changelog to user-relevant changes and preserved the detailed history in this file.
 

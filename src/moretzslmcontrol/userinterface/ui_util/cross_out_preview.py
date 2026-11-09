@@ -11,7 +11,7 @@ def disabled_preview(preview_bytes: NDArray[np.uint8]) -> NDArray[np.uint8]:
     source = Image.fromarray(preview_bytes).convert('RGBA')
     overlay = Image.new('RGBA', source.size)
     painter = ImageDraw.Draw(overlay)
-    font_size = max(8, round(min(height / 5, width / 8)))
+    font_size = 2 * max(8, round(min(height / 5, width / 8)))
     font = ImageFont.load_default(size=font_size)
     padding_x = max(1, round(font_size * 2 / 9))
     padding_y = max(1, round(font_size / 6))
