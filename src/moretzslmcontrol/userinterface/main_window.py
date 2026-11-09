@@ -273,6 +273,7 @@ class MainWindow(QMainWindow):
     def _apply_ui_scale(self) -> None:
         font_scale = self._ui_settings.global_scale * self._ui_settings.font_scale
         element_scale = self._ui_settings.global_scale * self._ui_settings.element_scale
+        numeric_fields = {*self._shift_inputs.values(), *self._modification_parameter_fields.values(), *self._zernike_parameter_fields.values()}
         for widget, base_font in self._base_fonts.items():
             font = QFont(base_font)
             if font.pointSizeF() > 0:
@@ -282,7 +283,10 @@ class MainWindow(QMainWindow):
                 continue
             base_size = self._base_minimum_sizes[widget]
             maximum = self._base_maximum_sizes[widget]
-            widget.setMinimumSize(round(base_size.width() * element_scale), round(base_size.height() * element_scale))
+            minimum_height = round(base_size.height() * element_scale)
+            if widget in numeric_fields:
+                minimum_height = max(minimum_height, ceil(widget.fontMetrics().height() * 1.8))
+            widget.setMinimumSize(round(base_size.width() * element_scale), minimum_height)
             widget.setMaximumSize(
                 round(maximum.width() * element_scale) if maximum.width() < 16777215 else 16777215,
                 round(maximum.height() * element_scale) if maximum.height() < 16777215 else 16777215,
@@ -357,8 +361,6 @@ class MainWindow(QMainWindow):
         self._slm_window_button = QPushButton()
         self._slm_window_button.setMinimumHeight(36)
         self._slm_window_button.setCheckable(True)
-        self._slm_output_status = QLabel("Output off")
-        self._slm_output_status.setAccessibleName("SLM output state")
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
@@ -386,8 +388,8 @@ class MainWindow(QMainWindow):
         lower_splitter.setChildrenCollapsible(False)
         lower_splitter.addWidget(self._build_pattern_group())
         lower_splitter.addWidget(self._build_console_group())
-        lower_splitter.setStretchFactor(0, 1)
-        lower_splitter.setStretchFactor(1, 0)
+        lower_splitter.setStretchFactor(0, 0)
+        lower_splitter.setStretchFactor(1, 1)
         lower_splitter.setSizes([280, 120])
         page_layout.addWidget(lower_splitter, 2)
         return page
@@ -396,7 +398,6 @@ class MainWindow(QMainWindow):
         group = QGroupBox("Hologram Preview")
         group.setMinimumWidth(260)
         layout = QVBoxLayout(group)
-        layout.addWidget(self._slm_output_status)
         layout.addWidget(self._build_pattern_component(None, component_key="total"), 1)
         return group
 
@@ -477,6 +478,7 @@ class MainWindow(QMainWindow):
         group = QGroupBox("Pattern composition")
         grid = QGridLayout(group)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        grid.setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
         for index, (title, key, options) in enumerate((
             ("Correction", "base", {"has_file_selector": True}),
             ("Hologram", "hologram", {"has_file_selector": True}),
@@ -491,6 +493,9 @@ class MainWindow(QMainWindow):
             preview.setMaximumSize(16777215, 16777215)
             preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             heading = QLabel(title)
+            heading_font = heading.font()
+            heading_font.setBold(True)
+            heading.setFont(heading_font)
             heading.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             heading.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             grid.addWidget(heading, 0, column, alignment=Qt.AlignmentFlag.AlignTop)
@@ -1773,7 +1778,6 @@ class MainWindow(QMainWindow):
         self._slm_window_button.setText("Disable SLM output" if enabled else "Enable SLM output")
         self._slm_window_button.setEnabled(connected or enabled)
         self._slm_window_button.setToolTip("Show or hide the native fullscreen SLM output without changing its pattern.")
-        self._slm_output_status.setText("Output on" if enabled and connected else "Output disconnected" if not connected else "Output off")
 
     @staticmethod
     def _is_slm_window_enabled(state: SessionState) -> bool:

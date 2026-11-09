@@ -1,5 +1,14 @@
 # Fork changelog
 
+## 0.3.5+moretzai.4 — 2026-11-09
+
+- Kept Pattern composition at its content height, recalculating when fonts or
+  previews change. Surplus splitter space goes to the console instead of adding
+  blank space beneath the pattern controls.
+- Made all four centered pattern-column headings bold.
+- Removed the redundant output-status text above the applied preview; the preview
+  and output button continue to communicate output state.
+
 ## 0.3.5+moretzai.3 — 2026-11-09
 
 - Centered pattern titles and previews in their columns, including the applied-output preview.
