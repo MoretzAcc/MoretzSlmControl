@@ -3,7 +3,9 @@
 Python client for controlling a Moretz SLM Control instance through HEROS.
 
 
-Using pip or conda:
+Requires Python 3.11 or newer. Use the same branch or release as the server for unreleased API additions.
+
+Using pip:
 ```bash
 python -m pip install "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=client"
 ```
@@ -15,14 +17,15 @@ uv add "git+https://github.com/MoretzAcc/MoretzSlmControl.git#subdirectory=clien
 
 ### Example
 
-A full example can be found in the `examples` directory.
+A full example can be found in [src/examples](src/examples).
 
 To apply a hologram pattern to the SLM:
 
 ```python
 from moretzslmclient import SlmHeroApi
+import numpy as np
 
-hologram: NDArray[np.float32] = ... # Your hologram pattern
+hologram = np.zeros((1080, 1920), dtype=np.float32)  # Use your SLM's native dimensions.
 
 hero_name = "slm_12345678__example_name"
 
@@ -49,7 +52,7 @@ with SlmHeroApi(hero_name) as slm:
     slm.setModificationZ(10)
 ```
 
-Each setter recalculates the modification pattern using the other current parameters.
+Each modification setter recalculates the modification pattern using the other current parameters by default.
 The UI automatically increases its slider range to include remotely supplied shifts;
 smaller shifts do not shrink it. Slider max shift has no HEROS setter.
 
@@ -64,4 +67,6 @@ plotHologram(phase)  # Bounded to at most about one million preview pixels.
 plotHologram(phase, max_preview_pixels=None)  # Explicit native sampling.
 ```
 
-Preview sampling retains native coordinate extents and never changes the array sent to the SLM. Shared phase conversion and file helpers live in this package; it does not import the GUI/server. Discovery opens a scoped network observer only when requested. To install this fork's client, substitute `MoretzAccAi` for `MoretzAcc` in the Git URL, or run `uv sync --project client` from the checkout. The server's `uv sync` installs the matching local client automatically.
+Preview sampling retains native coordinate extents and never changes the array sent to the SLM. Shared phase conversion and file helpers live in this package; it does not import the GUI/server. Discovery opens a scoped network observer only when requested.
+
+For local development, run `uv sync --project client` from the checkout. The server's `uv sync` installs the matching local client automatically.
