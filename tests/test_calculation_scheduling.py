@@ -151,3 +151,6 @@ class CalculationSchedulingTest(unittest.TestCase):
             self.window._change_ui_scale(0.05)
             self.window._change_ui_scale(-0.05)
         self.assertAlmostEqual(field.font().pointSizeF(), before)
+
+    def test_screen_information_keeps_bit_depth_compatibility_fields(self) -> None:
+        self.assertTrue({"output_depth", "monitor_depth", "depth_warning"}.issubset(self.window._screen_info_fields))
