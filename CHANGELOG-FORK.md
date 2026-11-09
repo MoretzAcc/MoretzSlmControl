@@ -1,5 +1,21 @@
 # Fork changelog
 
+## 0.3.5+moretzai.2 — 2026-11-09
+
+- Aligned associated-monitor headings and metadata to the top of each card, with
+  bold left-aligned headings and unused space below the metadata.
+- Replaced the scale row with `Scale UI: xx% + -` and a gear button. Added a
+  modeless settings window with immediate, independent font/element/preview factors.
+- Global scaling multiplies all three relative factors. Removed automatic startup
+  font reduction; new profiles use 100%. Added scrollable content and retained
+  native SLM dimensions and output bytes when UI preferences change.
+- Persisted all four factors atomically in per-user settings.json, creating defaults
+  on first run and backing up invalid files. Optional controls.ui configuration
+  exports/imports include these factors; legacy files keep existing UI preferences.
+- Validation: 64 unittest tests successful with one platform skip; native Windows
+  UI checks confirmed live font/preview changes, persistence, top-aligned headings,
+  and unchanged output bytes. Linux native GUI behavior was not verified.
+
 ## 0.3.5+moretzai.1 — 2026-11-09
 
 - Synchronized fork master with upstream 0.3.5, preserving the fork's merge history.

@@ -86,3 +86,4 @@ For code changes, use the lightest verification that matches the risk:
 - Findings and recorded evidence are in `dev/windows-review/REVIEW.md` and its `results/` directory.
 - Keep outstanding review checks failing until the underlying behavior is fixed; do not hide failed historical evidence.
 - Fork releases use the full upstream version plus `+moretzai.N`. Synchronize VERSION, server/client metadata and both lockfiles; record changes in CHANGELOG-FORK.md.
+- UI preferences live in `~/.config/moretzslmcontrol/settings.json`. Keep global and relative font/element/preview factors independent; UI scaling must never change native SLM buffers or output bytes. Configuration v2 optionally exports these factors as `controls.ui`; legacy files retain current preferences.
