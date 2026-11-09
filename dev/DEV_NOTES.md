@@ -16,7 +16,7 @@ uv run python -m unittest discover -s tests
 ### TODO Tasks
 
 - ! Design: Rework design of the enable / disable window button
-- Connection via Heros toggleable
+- Stabilize the HEROS connection toggle before exposing it in the user interface again.
 - remove duplicate code from client and server
 - make plotHologram faster
 - Method hologram_manager.py -> _set_pattern_flip stinks

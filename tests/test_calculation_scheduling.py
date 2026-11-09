@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PySide6.QtWidgets import QApplication, QScrollArea, QTabWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QScrollArea, QTabWidget
 from moretzslmcontrol.userinterface.main_window import MainWindow
 
 
@@ -154,6 +154,12 @@ class CalculationSchedulingTest(unittest.TestCase):
 
     def test_screen_information_keeps_bit_depth_compatibility_fields(self) -> None:
         self.assertTrue({"output_depth", "monitor_depth", "depth_warning"}.issubset(self.window._screen_info_fields))
+
+    def test_heros_connection_toggle_is_not_exposed_in_the_ui(self) -> None:
+        self.assertNotIn(
+            "Enable HEROS connection",
+            [checkbox.text() for checkbox in self.window.findChildren(QCheckBox)],
+        )
 
     def test_all_previews_follow_the_monitor_aspect_ratio(self) -> None:
         self.window._preview_aspect_ratio = 16 / 9
