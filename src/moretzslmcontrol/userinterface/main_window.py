@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self._shift_inputs: dict[str, QLineEdit] = {}
         self._shift_update_timers: dict[str, QTimer] = {}
         self._modification_parameter_fields: dict[str, QLineEdit] = {}
+        self._modification_unit_labels: dict[str, QLabel] = {}
         self._modification_inputs_by_screen: dict[str, dict[str, str]] = {}
         self._default_modification_inputs: dict[str, str] = {}
         self._modification_screen_uid: str | None = None
@@ -1110,7 +1111,13 @@ class MainWindow(QMainWindow):
             field_layout.setContentsMargins(0, 0, 0, 0)
             field_layout.setSpacing(4)
             field_layout.addWidget(field)
-            field_layout.addWidget(QLabel(unit))
+            unit_label = QLabel(unit or "µm")
+            unit_label.setFixedWidth(field.fontMetrics().horizontalAdvance("µm"))
+            if not unit:
+                # Reserve the unit column so unitless fields align with neighboring inputs.
+                unit_label.setStyleSheet("color: transparent;")
+            self._modification_unit_labels[key] = unit_label
+            field_layout.addWidget(unit_label)
             field_layout.addStretch()
             form.addRow(f"{label}:", field_row)
         return form

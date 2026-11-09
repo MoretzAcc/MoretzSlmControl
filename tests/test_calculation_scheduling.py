@@ -162,3 +162,8 @@ class CalculationSchedulingTest(unittest.TestCase):
         self.window._fit_preview_aspect_ratios()
         for preview in self.window._preview_labels.values():
             self.assertAlmostEqual(preview.width() / preview.height(), 16 / 9, delta=0.02)
+
+    def test_unitless_magnification_reserves_the_unit_column(self) -> None:
+        units = self.window._modification_unit_labels
+        self.assertEqual(units["magnification"].width(), units["wavelength"].width())
+        self.assertIn("transparent", units["magnification"].styleSheet())
