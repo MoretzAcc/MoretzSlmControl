@@ -1,5 +1,13 @@
 # Fork changelog
 
+## 0.3.5+moretzai.3 — 2026-11-09
+
+- Centered pattern titles and previews in their columns, including the applied-output preview.
+- Kept pattern titles, previews and controls at the top instead of stretching the
+  preview row and distributing surplus height around the titles.
+- Made composition plus signs bold and 1.5 times the normal font size, retaining
+  the global and relative font scaling behavior.
+
 ## 0.3.5+moretzai.2 — 2026-11-09
 
 - Aligned associated-monitor headings and metadata to the top of each card, with

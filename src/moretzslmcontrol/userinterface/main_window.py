@@ -476,7 +476,7 @@ class MainWindow(QMainWindow):
     def _build_pattern_group(self) -> QGroupBox:
         group = QGroupBox("Pattern composition")
         grid = QGridLayout(group)
-        grid.setRowStretch(1, 1)
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         for index, (title, key, options) in enumerate((
             ("Correction", "base", {"has_file_selector": True}),
             ("Hologram", "hologram", {"has_file_selector": True}),
@@ -489,13 +489,20 @@ class MainWindow(QMainWindow):
             controls.layout().removeWidget(preview)
             preview.setMinimumSize(0, 40)
             preview.setMaximumSize(16777215, 16777215)
-            preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
-            grid.addWidget(QLabel(title), 0, column)
-            grid.addWidget(preview, 1, column)
+            preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+            heading = QLabel(title)
+            heading.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            heading.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            grid.addWidget(heading, 0, column, alignment=Qt.AlignmentFlag.AlignTop)
+            grid.addWidget(preview, 1, column, alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             grid.addWidget(controls, 2, column, alignment=Qt.AlignmentFlag.AlignTop)
             grid.setColumnStretch(column, 1)
             if index < 3:
                 operator = QLabel("+")
+                operator_font = operator.font()
+                operator_font.setBold(True)
+                operator_font.setPointSizeF(operator_font.pointSizeF() * 1.5)
+                operator.setFont(operator_font)
                 operator.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 grid.addWidget(operator, 1, column + 1)
         return group
@@ -513,6 +520,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(component)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         if title is not None:
             title_label = QLabel(title)
@@ -531,7 +539,7 @@ class MainWindow(QMainWindow):
         preview.setForegroundRole(preview.foregroundRole())
         if component_key is not None:
             self._preview_labels[component_key] = preview
-        layout.addWidget(preview, 1 if component_key == "total" else 0)
+        layout.addWidget(preview, 0, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
 
         if component_key != "total":
             enabled = QCheckBox("Active")
