@@ -68,6 +68,7 @@ from moretzslmcontrol.util.patterns.zernike import makeCartGrid, makePattern, ze
 from moretzslmcontrol.userinterface.ui_util.cross_out_preview import disabled_preview
 from moretzslmcontrol.userinterface.ui_util.deferred_wheel_slider import DeferredWheelSlider
 from moretzslmcontrol.userinterface.ui_settings_dialog import UiSettingsDialog
+from moretzslmcontrol.userinterface.pattern_composition_group import PatternCompositionGroup
 from moretzslmcontrol.util.ui_settings import UiSettings, load_ui_settings, save_ui_settings, ui_settings_path
 
 if TYPE_CHECKING:
@@ -372,14 +373,15 @@ class MainWindow(QMainWindow):
         self._slm_window_button.clicked.connect(self._toggle_slm_window)
         title_row.addWidget(self._screen_title)
         title_row.addStretch()
+        self._reset_session_button = QPushButton("Reset session\u2026")
+        self._reset_session_button.clicked.connect(self._reset_session)
+        title_row.addWidget(self._reset_session_button)
         export_button = QPushButton("Export configuration…")
         export_button.clicked.connect(self._export_configuration)
         title_row.addWidget(export_button)
         import_button = QPushButton("Import configuration…")
         import_button.clicked.connect(self._import_configuration)
         title_row.addWidget(import_button)
-        self._reset_session_button = QPushButton("Reset session…")
-        self._reset_session_button.clicked.connect(self._reset_session)
         page_layout.addLayout(title_row)
 
         information_row = QHBoxLayout()
@@ -388,17 +390,13 @@ class MainWindow(QMainWindow):
         screen_information.setMinimumWidth(300)
         information_row.addWidget(screen_information, 1)
         monitor_information = self._build_monitor_information_group()
+        self._monitor_information_group = monitor_information
         information_row.addWidget(monitor_information, 2)
         applied_preview = self._build_applied_hologram_group()
         information_row.addWidget(applied_preview, 1)
         page_layout.addLayout(information_row)
-        lower_panel = QWidget()
-        lower_layout = QVBoxLayout(lower_panel)
-        lower_layout.setContentsMargins(0, 0, 0, 0)
-        lower_layout.setSpacing(6)
-        lower_layout.addWidget(self._build_pattern_group())
-        lower_layout.addWidget(self._build_console_group(), 1)
-        page_layout.addWidget(lower_panel, 2)
+        page_layout.addWidget(self._build_pattern_group(), 0, Qt.AlignmentFlag.AlignTop)
+        page_layout.addStretch(1)
         return page
 
     def _build_applied_hologram_group(self) -> QGroupBox:
@@ -482,10 +480,11 @@ class MainWindow(QMainWindow):
         return group
 
     def _build_pattern_group(self) -> QGroupBox:
-        group = QGroupBox("Pattern composition")
+        group = PatternCompositionGroup("Pattern composition")
         grid = QGridLayout(group)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         grid.setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+        file_controls: list[QWidget] = []
         for index, (title, key, options) in enumerate((
             ("Correction", "base", {"has_file_selector": True}),
             ("Hologram", "hologram", {"has_file_selector": True}),
@@ -494,6 +493,8 @@ class MainWindow(QMainWindow):
         )):
             column = index * 2
             controls = self._build_pattern_component(None, component_key=key, **options)
+            if key in ("base", "hologram"):
+                file_controls.append(controls)
             preview = self._preview_labels[key]
             controls.layout().removeWidget(preview)
             preview.setMinimumSize(0, 40)
@@ -517,6 +518,10 @@ class MainWindow(QMainWindow):
                 operator.setFont(operator_font)
                 operator.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 grid.addWidget(operator, 1, column + 1)
+        group.embed_console(
+            self._build_console_group(), grid, (file_controls[0], file_controls[1]),
+            padding_reference=self._monitor_information_group.layout(),
+        )
         return group
 
     def _build_pattern_component(
@@ -1630,19 +1635,14 @@ class MainWindow(QMainWindow):
         return f"{value:g}"
 
     def _build_console_group(self) -> QGroupBox:
-        group = QGroupBox()
+        group = QGroupBox("Console")
         layout = QVBoxLayout(group)
-        title_row = QHBoxLayout()
-        console_title = QLabel("Console")
-        console_title.setStyleSheet("font-weight: 600;")
-        title_row.addWidget(console_title)
-        title_row.addStretch()
-        title_row.addWidget(self._reset_session_button)
-        layout.addLayout(title_row)
         self._console = QTextEdit()
         self._console.setReadOnly(True)
         self._console.setPlaceholderText("Nothing to show yet.")
-        self._console.setMinimumHeight(78)
+        self._console.setMinimumHeight(0)
+        self._console.setMinimumWidth(0)
+        self._console.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         layout.addWidget(self._console)
         return group
 

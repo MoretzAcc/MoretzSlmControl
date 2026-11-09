@@ -1,5 +1,19 @@
 # Fork changelog
 
+## 0.3.5+moretzai.6 — 2026-11-09 — experimental
+
+- Branch: `experiment/console-in-pattern`; the stable `fork-windows` branch is unchanged.
+- Fitted the console into the existing space below Correction and Hologram without
+  contributing console size hints to the window or column layout.
+- Added an L-shaped pattern frame above and to the right of the console. Geometry
+  follows the actual controls when the window or scaling factors change.
+- Moved Console into its frame caption and Reset session next to Export configuration.
+- Added a small gap below the file-pattern controls and matched the console's
+  right-side insets to the Associated monitors section's layout padding.
+- Validation: 67 tests ran successfully with one platform skip; native Windows
+  checks confirmed dimension independence, scale/resize adaptation, sidebar dragging,
+  and unchanged native SLM output bytes. Native Linux rendering was not verified.
+
 ## 0.3.5+moretzai.5 — 2026-11-09
 
 - Added a draggable horizontal divider for the screen sidebar. Its width stays
