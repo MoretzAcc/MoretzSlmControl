@@ -1,3 +1,13 @@
+# MIGRATION TO NEW RPO
+
+> [!IMPORTANT]
+> This project has moved to [SLM Control](https://github.com/MoretzAcc/SlmControl).
+> This repository is archived. Please use the new repository for updates and issues.
+
+
+
+
+
 # Moretz SLM Control
 
 Desktop application for controlling spatial light modulator (SLM) displays.
